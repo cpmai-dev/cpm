@@ -6,7 +6,7 @@
   "description": "The package manager for Claude Code",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cpm-ai/cpm"
+    "url": "https://github.com/cpmai-dev/cpm"
   },
   "scripts": {
     "dev": "turbo dev",
