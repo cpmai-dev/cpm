@@ -1,17 +1,25 @@
+/**
+ * Registry client for fetching and searching packages
+ * Implements Interface Segregation with focused interfaces
+ */
 import got from "got";
 import fs from "fs-extra";
 import path from "path";
 import os from "os";
-import type { RegistryPackage, PackageType } from "../types.js";
+import type { RegistryPackage, PackageType, SearchSort } from "../types.js";
 import { resolvePackageType } from "../types.js";
+import { LIMITS, TIMEOUTS } from "../constants.js";
 
-// Registry configuration (configurable via env)
+// Registry configuration
 const DEFAULT_REGISTRY_URL =
   process.env.CPM_REGISTRY_URL ||
   "https://raw.githubusercontent.com/cpmai-dev/packages/main/registry.json";
 const CACHE_DIR = path.join(os.homedir(), ".cpm", "cache");
 const CACHE_FILE = path.join(CACHE_DIR, "registry.json");
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// ============================================================================
+// Types
+// ============================================================================
 
 export interface RegistryData {
   version: number;
@@ -24,7 +32,7 @@ export interface SearchOptions {
   type?: PackageType;
   limit?: number;
   offset?: number;
-  sort?: "downloads" | "stars" | "recent" | "name";
+  sort?: SearchSort;
 }
 
 export interface SearchResult {
@@ -32,11 +40,58 @@ export interface SearchResult {
   total: number;
 }
 
+// ============================================================================
+// Interfaces (Interface Segregation Principle)
+// ============================================================================
+
+/**
+ * Interface for fetching registry data
+ */
+export interface RegistryFetcher {
+  fetch(forceRefresh?: boolean): Promise<RegistryData>;
+}
+
+/**
+ * Interface for searching packages
+ */
+export interface PackageSearcher {
+  search(options?: SearchOptions): Promise<SearchResult>;
+}
+
+/**
+ * Interface for looking up individual packages
+ */
+export interface PackageLookup {
+  getPackage(name: string): Promise<RegistryPackage | null>;
+}
+
+// ============================================================================
+// Comparators for sorting
+// ============================================================================
+
+type PackageComparator = (a: RegistryPackage, b: RegistryPackage) => number;
+
+const comparators: Record<SearchSort, PackageComparator> = {
+  downloads: (a, b) => (b.downloads ?? 0) - (a.downloads ?? 0),
+  stars: (a, b) => (b.stars ?? 0) - (a.stars ?? 0),
+  recent: (a, b) =>
+    new Date(b.publishedAt || 0).getTime() -
+    new Date(a.publishedAt || 0).getTime(),
+  name: (a, b) => (a.name ?? "").localeCompare(b.name ?? ""),
+};
+
+// ============================================================================
+// Registry Implementation
+// ============================================================================
+
 /**
  * Registry client for fetching and searching packages
+ * Implements all segregated interfaces
  */
-export class Registry {
-  private registryUrl: string;
+export class Registry
+  implements RegistryFetcher, PackageSearcher, PackageLookup
+{
+  private readonly registryUrl: string;
   private cache: RegistryData | null = null;
   private cacheTimestamp: number = 0;
 
@@ -48,77 +103,19 @@ export class Registry {
    * Fetch the registry data (with caching)
    */
   async fetch(forceRefresh: boolean = false): Promise<RegistryData> {
-    // Check memory cache first
-    if (
-      !forceRefresh &&
-      this.cache &&
-      Date.now() - this.cacheTimestamp < CACHE_TTL
-    ) {
-      return this.cache;
+    if (this.hasValidMemoryCache() && !forceRefresh) {
+      return this.cache!;
     }
 
-    // Check file cache
     if (!forceRefresh) {
-      try {
-        await fs.ensureDir(CACHE_DIR);
-        if (await fs.pathExists(CACHE_FILE)) {
-          const stat = await fs.stat(CACHE_FILE);
-          if (Date.now() - stat.mtimeMs < CACHE_TTL) {
-            const cached = await fs.readJson(CACHE_FILE);
-            this.cache = cached;
-            this.cacheTimestamp = Date.now();
-            return cached;
-          }
-        }
-      } catch {
-        // Cache read failed, continue to fetch
+      const fileCache = await this.loadFileCache();
+      if (fileCache) {
+        this.updateMemoryCache(fileCache);
+        return fileCache;
       }
     }
 
-    // Fetch from registry
-    try {
-      const response = await got(this.registryUrl, {
-        timeout: { request: 10000 },
-        responseType: "json",
-      });
-
-      const data = response.body as RegistryData;
-
-      // Update caches
-      this.cache = data;
-      this.cacheTimestamp = Date.now();
-
-      // Write to file cache
-      try {
-        await fs.ensureDir(CACHE_DIR);
-        await fs.writeJson(CACHE_FILE, data, { spaces: 2 });
-      } catch {
-        // Cache write failed, not critical
-      }
-
-      return data;
-    } catch {
-      // If fetch fails and we have stale cache, use it
-      if (this.cache) {
-        return this.cache;
-      }
-
-      // Try to load stale file cache
-      try {
-        if (await fs.pathExists(CACHE_FILE)) {
-          const cached = await fs.readJson(CACHE_FILE);
-          this.cache = cached;
-          return cached;
-        }
-      } catch {
-        // Stale cache also failed
-      }
-
-      // No cache available, throw error
-      throw new Error(
-        "Unable to fetch package registry. Please check your internet connection and try again.",
-      );
-    }
+    return this.fetchFromNetwork();
   }
 
   /**
@@ -128,54 +125,12 @@ export class Registry {
     const data = await this.fetch();
     let packages = [...data.packages];
 
-    // Filter by query
-    if (options.query) {
-      const query = options.query.toLowerCase();
-      packages = packages.filter(
-        (pkg) =>
-          pkg.name?.toLowerCase().includes(query) ||
-          pkg.description?.toLowerCase().includes(query) ||
-          pkg.keywords?.some((k) => k?.toLowerCase().includes(query)),
-      );
-    }
-
-    // Filter by type
-    if (options.type) {
-      packages = packages.filter((pkg) => {
-        try {
-          return resolvePackageType(pkg) === options.type;
-        } catch {
-          return false;
-        }
-      });
-    }
-
-    // Sort
-    const sort = options.sort || "downloads";
-    packages.sort((a, b) => {
-      switch (sort) {
-        case "downloads":
-          return (b.downloads ?? 0) - (a.downloads ?? 0);
-        case "stars":
-          return (b.stars ?? 0) - (a.stars ?? 0);
-        case "recent":
-          return (
-            new Date(b.publishedAt || 0).getTime() -
-            new Date(a.publishedAt || 0).getTime()
-          );
-        case "name":
-          return (a.name ?? "").localeCompare(b.name ?? "");
-        default:
-          return 0;
-      }
-    });
+    packages = this.filterByQuery(packages, options.query);
+    packages = this.filterByType(packages, options.type);
+    packages = this.sortPackages(packages, options.sort || "downloads");
 
     const total = packages.length;
-
-    // Pagination
-    const offset = options.offset || 0;
-    const limit = options.limit || 10;
-    packages = packages.slice(offset, offset + limit);
+    packages = this.paginate(packages, options.offset, options.limit);
 
     return { packages, total };
   }
@@ -186,6 +141,131 @@ export class Registry {
   async getPackage(name: string): Promise<RegistryPackage | null> {
     const data = await this.fetch();
     return data.packages.find((pkg) => pkg.name === name) || null;
+  }
+
+  // ============================================================================
+  // Private Helpers
+  // ============================================================================
+
+  private hasValidMemoryCache(): boolean {
+    return (
+      this.cache !== null &&
+      Date.now() - this.cacheTimestamp < LIMITS.CACHE_TTL_MS
+    );
+  }
+
+  private updateMemoryCache(data: RegistryData): void {
+    this.cache = data;
+    this.cacheTimestamp = Date.now();
+  }
+
+  private async loadFileCache(): Promise<RegistryData | null> {
+    try {
+      await fs.ensureDir(CACHE_DIR);
+      if (await fs.pathExists(CACHE_FILE)) {
+        const stat = await fs.stat(CACHE_FILE);
+        if (Date.now() - stat.mtimeMs < LIMITS.CACHE_TTL_MS) {
+          return await fs.readJson(CACHE_FILE);
+        }
+      }
+    } catch {
+      // Cache read failed
+    }
+    return null;
+  }
+
+  private async saveFileCache(data: RegistryData): Promise<void> {
+    try {
+      await fs.ensureDir(CACHE_DIR);
+      await fs.writeJson(CACHE_FILE, data, { spaces: 2 });
+    } catch {
+      // Cache write failed, not critical
+    }
+  }
+
+  private async fetchFromNetwork(): Promise<RegistryData> {
+    try {
+      const response = await got(this.registryUrl, {
+        timeout: { request: TIMEOUTS.REGISTRY_FETCH },
+        responseType: "json",
+      });
+
+      const data = response.body as RegistryData;
+      this.updateMemoryCache(data);
+      await this.saveFileCache(data);
+
+      return data;
+    } catch {
+      return this.handleNetworkError();
+    }
+  }
+
+  private async handleNetworkError(): Promise<RegistryData> {
+    if (this.cache) {
+      return this.cache;
+    }
+
+    try {
+      if (await fs.pathExists(CACHE_FILE)) {
+        const cached = await fs.readJson(CACHE_FILE);
+        this.cache = cached;
+        return cached;
+      }
+    } catch {
+      // Stale cache also failed
+    }
+
+    throw new Error(
+      "Unable to fetch package registry. Please check your internet connection and try again.",
+    );
+  }
+
+  private filterByQuery(
+    packages: RegistryPackage[],
+    query?: string,
+  ): RegistryPackage[] {
+    if (!query) return packages;
+
+    const lowerQuery = query.toLowerCase();
+    return packages.filter(
+      (pkg) =>
+        pkg.name?.toLowerCase().includes(lowerQuery) ||
+        pkg.description?.toLowerCase().includes(lowerQuery) ||
+        pkg.keywords?.some((k) => k?.toLowerCase().includes(lowerQuery)),
+    );
+  }
+
+  private filterByType(
+    packages: RegistryPackage[],
+    type?: PackageType,
+  ): RegistryPackage[] {
+    if (!type) return packages;
+
+    return packages.filter((pkg) => {
+      try {
+        return resolvePackageType(pkg) === type;
+      } catch {
+        return false;
+      }
+    });
+  }
+
+  private sortPackages(
+    packages: RegistryPackage[],
+    sort: SearchSort,
+  ): RegistryPackage[] {
+    const comparator = comparators[sort];
+    return [...packages].sort(comparator);
+  }
+
+  private paginate(
+    packages: RegistryPackage[],
+    offset?: number,
+    limit?: number,
+  ): RegistryPackage[] {
+    const start = offset || 0;
+    const end = start + (limit || 10);
+    return packages.slice(start, end);
   }
 }
 
