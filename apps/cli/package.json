@@ -1,5 +1,5 @@
 {
-  "name": "@cpm/cli",
+  "name": "@cpmai/cli",
   "version": "0.1.1",
   "description": "The package manager for Claude Code - cpm-ai.dev",
   "keywords": [

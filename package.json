@@ -16,11 +16,11 @@
     "test": "turbo test",
     "clean": "turbo clean && rm -rf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "cli": "pnpm --filter @cpm/cli",
+    "cli": "pnpm --filter @cpmai/cli",
     "audit": "pnpm audit --audit-level=high",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "pnpm build && pnpm --filter @cpm/cli publish --tag beta --access public",
+    "release": "pnpm build && pnpm --filter @cpmai/cli publish --tag beta --access public",
     "prepare": "husky"
   },
   "devDependencies": {
