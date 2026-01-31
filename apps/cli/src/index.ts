@@ -7,6 +7,7 @@ import { searchCommand } from './commands/search.js';
 import { listCommand } from './commands/list.js';
 import { initCommand } from './commands/init.js';
 import { uninstallCommand } from './commands/uninstall.js';
+import { configureLogger, logger } from './utils/logger.js';
 
 const program = new Command();
 
@@ -23,15 +24,23 @@ const logo = `
 program
   .name('cpm')
   .description(`${logo}\n  ${chalk.dim('The package manager for Claude Code')}\n`)
-  .version('0.1.0');
+  .version('0.1.0')
+  .option('-q, --quiet', 'Suppress all output except errors')
+  .option('-v, --verbose', 'Enable verbose output for debugging')
+  .hook('preAction', (thisCommand) => {
+    const opts = thisCommand.optsWithGlobals();
+    configureLogger({
+      quiet: opts.quiet,
+      verbose: opts.verbose,
+    });
+  });
 
 // Install command
 program
   .command('install <package>')
   .alias('i')
   .description('Install a package')
-  .option('-p, --platform <platform>', 'Target platform (cursor, claude-code, windsurf, all)', 'all')
-  .option('-g, --global', 'Install globally for all projects')
+  .option('-p, --platform <platform>', 'Target platform (claude-code)', 'all')
   .action(installCommand);
 
 // Uninstall command
@@ -56,7 +65,6 @@ program
   .command('list')
   .alias('ls')
   .description('List installed packages')
-  .option('-g, --global', 'List global packages')
   .action(listCommand);
 
 // Init command
@@ -70,8 +78,8 @@ program
 program
   .command('info <package>')
   .description('Show package details')
-  .action(async (packageName) => {
-    console.log(chalk.yellow('Coming soon: package info'));
+  .action(async () => {
+    logger.warn('Coming soon: package info');
   });
 
 // Update command
@@ -80,7 +88,7 @@ program
   .alias('up')
   .description('Update installed packages')
   .action(async () => {
-    console.log(chalk.yellow('Coming soon: package updates'));
+    logger.warn('Coming soon: package updates');
   });
 
 // Publish command
@@ -88,7 +96,7 @@ program
   .command('publish')
   .description('Publish a package to the registry')
   .action(async () => {
-    console.log(chalk.yellow('Coming soon: package publishing'));
+    logger.warn('Coming soon: package publishing');
   });
 
 // Parse and execute

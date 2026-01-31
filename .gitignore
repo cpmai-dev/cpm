@@ -31,5 +31,8 @@ pnpm-debug.log*
 # Testing
 coverage/
 
+# CPM cache (packages installed during development)
+.cpm/
+
 # Misc
 *.local

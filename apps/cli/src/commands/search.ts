@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import type { PackageType } from '../types.js';
 import { registry, type SearchOptions as RegistrySearchOptions } from '../utils/registry.js';
+import { logger } from '../utils/logger.js';
 
 interface SearchOptions {
   type?: string;
@@ -35,7 +36,7 @@ export async function searchCommand(
   query: string,
   options: SearchOptions
 ): Promise<void> {
-  const spinner = ora(`Searching for "${query}"...`).start();
+  const spinner = logger.isQuiet() ? null : ora(`Searching for "${query}"...`).start();
   const limit = parseInt(options.limit || '10', 10);
 
   try {
@@ -56,16 +57,16 @@ export async function searchCommand(
     // Search using the registry client
     const results = await registry.search(searchOptions);
 
-    spinner.stop();
+    if (spinner) spinner.stop();
 
     if (results.packages.length === 0) {
-      console.log(chalk.yellow(`\nNo packages found for "${query}"`));
-      console.log(chalk.dim('\nAvailable package types: rules, skill, mcp'));
-      console.log(chalk.dim('Try: cpm search react --type rules'));
+      logger.warn(`No packages found for "${query}"`);
+      logger.log(chalk.dim('\nAvailable package types: rules, skill, mcp'));
+      logger.log(chalk.dim('Try: cpm search react --type rules'));
       return;
     }
 
-    console.log(chalk.dim(`\nFound ${results.total} package(s)\n`));
+    logger.log(chalk.dim(`\nFound ${results.total} package(s)\n`));
 
     // Display results
     for (const pkg of results.packages) {
@@ -81,13 +82,13 @@ export async function searchCommand(
       }
 
       // Package name and version
-      console.log(
+      logger.log(
         `${emoji} ${chalk.bold.white(pkg.name)} ${chalk.dim(`v${pkg.version}`)}` +
         (badges.length > 0 ? ` ${badges.join(' ')}` : '')
       );
 
       // Description
-      console.log(`   ${chalk.dim(pkg.description)}`);
+      logger.log(`   ${chalk.dim(pkg.description)}`);
 
       // Metadata line (handle optional stars)
       const meta = [
@@ -96,21 +97,18 @@ export async function searchCommand(
         pkg.stars !== undefined ? chalk.dim(`★ ${pkg.stars}`) : null,
         chalk.dim(`@${pkg.author}`),
       ].filter(Boolean) as string[];
-      console.log(`   ${meta.join(chalk.dim(' · '))}`);
+      logger.log(`   ${meta.join(chalk.dim(' · '))}`);
 
-      console.log();
+      logger.newline();
     }
 
     // Install hint
-    console.log(
-      chalk.dim('─'.repeat(50))
-    );
-    console.log(
-      chalk.dim(`Install with: ${chalk.cyan('cpm install <package-name>')}`)
-    );
+    logger.log(chalk.dim('─'.repeat(50)));
+    logger.log(chalk.dim(`Install with: ${chalk.cyan('cpm install <package-name>')}`));
   } catch (error) {
-    spinner.fail('Search failed');
-    console.error(chalk.red(error instanceof Error ? error.message : 'Unknown error'));
+    if (spinner) spinner.fail('Search failed');
+    else logger.error('Search failed');
+    logger.error(error instanceof Error ? error.message : 'Unknown error');
   }
 }
 

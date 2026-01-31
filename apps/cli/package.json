@@ -39,10 +39,11 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@cpm/types": "workspace:*",
     "@cpm/registry-client": "workspace:*",
+    "@cpm/types": "workspace:*",
     "chalk": "^5.4.1",
     "commander": "^12.1.0",
+    "consola": "^3.4.2",
     "fs-extra": "^11.2.0",
     "got": "^14.4.5",
     "ora": "^8.1.1",

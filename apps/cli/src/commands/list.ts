@@ -1,49 +1,119 @@
+/**
+ * List installed packages by scanning ~/.claude/
+ */
 import chalk from 'chalk';
-import { getInstalledPackages, getGlobalCpmDir } from '../utils/config.js';
+import fs from 'fs-extra';
+import path from 'path';
+import os from 'os';
+import { logger } from '../utils/logger.js';
 
-interface ListOptions {
-  global?: boolean;
+interface InstalledItem {
+  name: string;
+  type: 'rules' | 'skill' | 'mcp';
+  path: string;
 }
 
 const typeColors: Record<string, (str: string) => string> = {
   rules: chalk.yellow,
   skill: chalk.blue,
   mcp: chalk.magenta,
-  agent: chalk.green,
-  hook: chalk.cyan,
-  workflow: chalk.red,
-  template: chalk.white,
-  bundle: chalk.gray,
 };
 
-export async function listCommand(options: ListOptions): Promise<void> {
+/**
+ * Scan ~/.claude/ directories to find installed packages
+ */
+async function scanInstalledPackages(): Promise<InstalledItem[]> {
+  const items: InstalledItem[] = [];
+  const claudeHome = path.join(os.homedir(), '.claude');
+
+  // Scan rules directory
+  const rulesDir = path.join(claudeHome, 'rules');
+  if (await fs.pathExists(rulesDir)) {
+    const files = await fs.readdir(rulesDir);
+    for (const file of files) {
+      if (file.endsWith('.md')) {
+        items.push({
+          name: file.replace('.md', ''),
+          type: 'rules',
+          path: path.join(rulesDir, file),
+        });
+      }
+    }
+  }
+
+  // Scan skills directory
+  const skillsDir = path.join(claudeHome, 'skills');
+  if (await fs.pathExists(skillsDir)) {
+    const dirs = await fs.readdir(skillsDir);
+    for (const dir of dirs) {
+      const skillPath = path.join(skillsDir, dir);
+      const stat = await fs.stat(skillPath);
+      if (stat.isDirectory()) {
+        items.push({
+          name: dir,
+          type: 'skill',
+          path: skillPath,
+        });
+      }
+    }
+  }
+
+  // Scan MCP servers from .claude.json
+  const mcpConfigPath = path.join(os.homedir(), '.claude.json');
+  if (await fs.pathExists(mcpConfigPath)) {
+    try {
+      const config = await fs.readJson(mcpConfigPath);
+      const mcpServers = config.mcpServers || {};
+      for (const name of Object.keys(mcpServers)) {
+        items.push({
+          name,
+          type: 'mcp',
+          path: mcpConfigPath,
+        });
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }
+
+  return items;
+}
+
+export async function listCommand(): Promise<void> {
   try {
-    const projectPath = options.global ? getGlobalCpmDir() : process.cwd();
-    const packages = await getInstalledPackages(projectPath);
+    const packages = await scanInstalledPackages();
 
     if (packages.length === 0) {
-      console.log(chalk.yellow('No packages installed'));
-      console.log(chalk.dim(`\nRun ${chalk.cyan('cpm install <package>')} to install a package`));
+      logger.warn('No packages installed');
+      logger.log(chalk.dim(`\nRun ${chalk.cyan('cpm install <package>')} to install a package`));
       return;
     }
 
-    console.log(chalk.bold(`Installed packages (${packages.length}):\n`));
+    logger.log(chalk.bold(`\nInstalled packages (${packages.length}):\n`));
 
+    // Group by type
+    const byType: Record<string, InstalledItem[]> = {};
     for (const pkg of packages) {
-      const typeColor = typeColors[pkg.type] || chalk.white;
-
-      console.log(
-        `  ${chalk.green('◉')} ${chalk.bold(pkg.name)} ${chalk.dim(`v${pkg.version}`)}`
-      );
-      console.log(
-        `    ${typeColor(pkg.type)} · ${pkg.platforms.map(p => chalk.dim(p)).join(', ')}`
-      );
+      if (!byType[pkg.type]) {
+        byType[pkg.type] = [];
+      }
+      byType[pkg.type].push(pkg);
     }
 
-    console.log();
-    console.log(chalk.dim('Run cpm uninstall <package> to remove a package'));
+    // Display by type
+    for (const [type, items] of Object.entries(byType)) {
+      const typeColor = typeColors[type] || chalk.white;
+      logger.log(typeColor(`  ${type.toUpperCase()}`));
+
+      for (const item of items) {
+        logger.log(`    ${chalk.green('◉')} ${chalk.bold(item.name)}`);
+      }
+      logger.newline();
+    }
+
+    logger.log(chalk.dim('Run cpm uninstall <package> to remove a package'));
   } catch (error) {
-    console.error(chalk.red('Failed to list packages'));
-    console.error(chalk.red(error instanceof Error ? error.message : 'Unknown error'));
+    logger.error('Failed to list packages');
+    logger.error(error instanceof Error ? error.message : 'Unknown error');
   }
 }

@@ -3,6 +3,7 @@ import path from 'path';
 import type { PackageManifest } from '../types.js';
 import { PlatformAdapter, InstallResult } from './base.js';
 import { getRulesPath, getSkillsPath, getClaudeCodeHome } from '../utils/platform.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Allowed commands for MCP servers (security allowlist)
@@ -300,7 +301,7 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
       filesWritten.push(mcpConfigPath);
     } catch (error) {
       // Log but don't fail uninstall if MCP removal fails
-      console.warn(`Warning: Could not update MCP config: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      logger.warn(`Could not update MCP config: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -321,7 +322,7 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
           // Validate and sanitize file name for security
           const validation = sanitizeFileName(file);
           if (!validation.safe) {
-            console.warn(`Skipping unsafe file: ${file} (${validation.error})`);
+            logger.warn(`Skipping unsafe file: ${file} (${validation.error})`);
             continue;
           }
 
@@ -330,7 +331,7 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
 
           // Verify destination is within allowed directory
           if (!isPathWithinDirectory(destPath, rulesDir)) {
-            console.warn(`Blocked path traversal attempt: ${file}`);
+            logger.warn(`Blocked path traversal attempt: ${file}`);
             continue;
           }
 
@@ -377,7 +378,7 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
           // Validate and sanitize file name for security
           const validation = sanitizeFileName(file);
           if (!validation.safe) {
-            console.warn(`Skipping unsafe file: ${file} (${validation.error})`);
+            logger.warn(`Skipping unsafe file: ${file} (${validation.error})`);
             continue;
           }
 
@@ -386,7 +387,7 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
 
           // Verify destination is within allowed directory
           if (!isPathWithinDirectory(destPath, skillDir)) {
-            console.warn(`Blocked path traversal attempt: ${file}`);
+            logger.warn(`Blocked path traversal attempt: ${file}`);
             continue;
           }
 
@@ -427,7 +428,7 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
       try {
         existingConfig = await fs.readJson(mcpConfigPath);
       } catch (error) {
-        console.warn(`Warning: Could not parse ${mcpConfigPath}, creating new config`);
+        logger.warn(`Could not parse ${mcpConfigPath}, creating new config`);
         existingConfig = {};
       }
     }

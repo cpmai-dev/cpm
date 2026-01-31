@@ -1,6 +1,6 @@
 /**
  * Package downloader utilities
- * Handles downloading, extracting, and caching packages from the registry
+ * Downloads packages directly without caching
  */
 import got from 'got';
 import fs from 'fs-extra';
@@ -9,11 +9,11 @@ import os from 'os';
 import * as tar from 'tar';
 import yaml from 'yaml';
 import type { RegistryPackage, PackageManifest, PackageType } from '../types.js';
-import { getCpmDir, ensureCpmDir } from './config.js';
 import { getEmbeddedManifest } from './embedded-packages.js';
+import { logger } from './logger.js';
 
-/** Cache directory for downloaded packages */
-const DOWNLOAD_CACHE_DIR = path.join(os.homedir(), '.cpm', 'cache', 'packages');
+/** Temporary directory for downloads */
+const TEMP_DIR = path.join(os.tmpdir(), 'cpm-downloads');
 
 /** Base URL for packages registry (configurable via env) */
 const PACKAGES_BASE_URL = process.env.CPM_PACKAGES_URL || 'https://raw.githubusercontent.com/cpmai-dev/packages/main';
@@ -73,8 +73,8 @@ function validatePackagePath(pkgPath: string): string {
 
 export interface DownloadResult {
   success: boolean;
-  packagePath: string;
   manifest: PackageManifest;
+  tempDir?: string;
   error?: string;
 }
 
@@ -83,30 +83,22 @@ export interface DownloadResult {
 // ============================================================================
 
 /**
- * Download and extract a package from the registry
- * Tries multiple sources in priority order:
- * 1. Path-based fetch (cpmai-dev registry)
- * 2. Repository fetch (GitHub repos)
- * 3. Tarball download
- * 4. Embedded manifest (offline fallback)
- * 5. Registry data (last resort)
+ * Download a package from the registry
+ * Returns manifest and temporary directory with files
  */
-export async function downloadPackage(
-  pkg: RegistryPackage,
-  projectPath: string = process.cwd()
-): Promise<DownloadResult> {
+export async function downloadPackage(pkg: RegistryPackage): Promise<DownloadResult> {
   try {
-    await ensureCpmDir(projectPath);
-    await fs.ensureDir(DOWNLOAD_CACHE_DIR);
+    await fs.ensureDir(TEMP_DIR);
 
-    const packageDir = path.join(getCpmDir(projectPath), 'packages', pkg.name);
-    await fs.ensureDir(packageDir);
+    // Create temp directory for this package
+    const packageTempDir = path.join(TEMP_DIR, `${pkg.name.replace(/[@\/]/g, '_')}-${Date.now()}`);
+    await fs.ensureDir(packageTempDir);
 
     let manifest: PackageManifest | null = null;
 
     // Try sources in priority order
     if (pkg.path) {
-      manifest = await fetchPackageFromPath(pkg, packageDir);
+      manifest = await fetchPackageFromPath(pkg, packageTempDir);
     }
 
     if (!manifest && pkg.repository) {
@@ -114,7 +106,7 @@ export async function downloadPackage(
     }
 
     if (!manifest && pkg.tarball) {
-      manifest = await downloadAndExtractTarball(pkg, packageDir);
+      manifest = await downloadAndExtractTarball(pkg, packageTempDir);
     }
 
     if (!manifest) {
@@ -125,21 +117,26 @@ export async function downloadPackage(
       manifest = createManifestFromRegistry(pkg);
     }
 
-    // Write manifest to package directory
-    await fs.writeFile(
-      path.join(packageDir, 'cpm.yaml'),
-      yaml.stringify(manifest),
-      'utf-8'
-    );
-
-    return { success: true, packagePath: packageDir, manifest };
+    return { success: true, manifest, tempDir: packageTempDir };
   } catch (error) {
     return {
       success: false,
-      packagePath: '',
       manifest: {} as PackageManifest,
       error: error instanceof Error ? error.message : 'Download failed',
     };
+  }
+}
+
+/**
+ * Clean up temporary download directory
+ */
+export async function cleanupTempDir(tempDir: string): Promise<void> {
+  try {
+    if (tempDir.startsWith(TEMP_DIR)) {
+      await fs.remove(tempDir);
+    }
+  } catch {
+    // Ignore cleanup errors
   }
 }
 
@@ -173,53 +170,33 @@ async function fetchManifestFromRepo(repoUrl: string): Promise<PackageManifest |
  */
 async function downloadAndExtractTarball(
   pkg: RegistryPackage,
-  packageDir: string
+  tempDir: string
 ): Promise<PackageManifest | null> {
   if (!pkg.tarball) return null;
 
   try {
-    const tarballPath = await downloadTarball(pkg.tarball, pkg.name, pkg.version);
-    if (!tarballPath) return null;
-
-    await extractTarball(tarballPath, packageDir);
-
-    const manifestPath = path.join(packageDir, 'cpm.yaml');
-    if (await fs.pathExists(manifestPath)) {
-      const content = await fs.readFile(manifestPath, 'utf-8');
-      return yaml.parse(content);
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Download tarball to cache
- */
-async function downloadTarball(url: string, name: string, version: string): Promise<string | null> {
-  try {
     // Enforce HTTPS for security
-    const parsedUrl = new URL(url);
+    const parsedUrl = new URL(pkg.tarball);
     if (parsedUrl.protocol !== 'https:') {
       throw new Error('Only HTTPS URLs are allowed for downloads');
     }
 
-    const safeName = name.replace(/[@\/]/g, '_');
-    const tarballPath = path.join(DOWNLOAD_CACHE_DIR, `${safeName}-${version}.tar.gz`);
-
-    if (await fs.pathExists(tarballPath)) {
-      return tarballPath;
-    }
-
-    const response = await got(url, {
+    const response = await got(pkg.tarball, {
       timeout: { request: TIMEOUTS.TARBALL_DOWNLOAD },
       followRedirect: true,
       responseType: 'buffer',
     });
 
+    const tarballPath = path.join(tempDir, 'package.tar.gz');
     await fs.writeFile(tarballPath, response.body);
-    return tarballPath;
+    await extractTarball(tarballPath, tempDir);
+
+    const manifestPath = path.join(tempDir, 'cpm.yaml');
+    if (await fs.pathExists(manifestPath)) {
+      const content = await fs.readFile(manifestPath, 'utf-8');
+      return yaml.parse(content);
+    }
+    return null;
   } catch {
     return null;
   }
@@ -242,7 +219,7 @@ async function extractTarball(tarballPath: string, destDir: string): Promise<voi
                            resolvedPath === resolvedDestDir;
 
       if (!isWithinDest) {
-        console.warn(`Blocked path traversal in tarball: ${entryPath}`);
+        logger.warn(`Blocked path traversal in tarball: ${entryPath}`);
         return false;
       }
       return true;
@@ -255,7 +232,7 @@ async function extractTarball(tarballPath: string, destDir: string): Promise<voi
  */
 async function fetchPackageFromPath(
   pkg: RegistryPackage,
-  packageDir: string
+  tempDir: string
 ): Promise<PackageManifest | null> {
   if (!pkg.path) return null;
 
@@ -289,9 +266,9 @@ async function fetchPackageFromPath(
     for (const file of files) {
       if (file.type === 'file' && file.download_url) {
         const safeFileName = sanitizeFileName(file.name);
-        const destPath = path.join(packageDir, safeFileName);
+        const destPath = path.join(tempDir, safeFileName);
 
-        validatePathWithinDir(destPath, packageDir);
+        validatePathWithinDir(destPath, tempDir);
 
         const fileResponse = await got(file.download_url, {
           timeout: { request: TIMEOUTS.API_REQUEST },

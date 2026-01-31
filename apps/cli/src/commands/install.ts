@@ -1,17 +1,18 @@
 /**
  * Install command for CPM
- * Handles downloading and installing packages from the registry
+ * Downloads and installs packages directly to ~/.claude/
  */
 import chalk from 'chalk';
 import ora from 'ora';
 import path from 'path';
-import type { PackageManifest, Platform, InstalledPackage } from '../types.js';
+import type { PackageManifest, Platform } from '../types.js';
 import type { InstallResult } from '../adapters/base.js';
 import { getAdapter } from '../adapters/index.js';
 import { getDetectedPlatforms } from '../utils/platform.js';
-import { addInstalledPackage, ensureCpmDir } from '../utils/config.js';
+import { ensureClaudeDirs } from '../utils/config.js';
 import { registry } from '../utils/registry.js';
-import { downloadPackage } from '../utils/downloader.js';
+import { downloadPackage, cleanupTempDir } from '../utils/downloader.js';
+import { logger } from '../utils/logger.js';
 
 // ============================================================================
 // Types
@@ -19,7 +20,6 @@ import { downloadPackage } from '../utils/downloader.js';
 
 export interface InstallOptions {
   platform?: string;
-  global?: boolean;
   version?: string;
 }
 
@@ -39,31 +39,27 @@ const MAX_PACKAGE_NAME_LENGTH = 214;
 
 /**
  * Validate package name format
- * Follows npm package naming conventions with enhanced security checks
  */
 function validatePackageName(name: string): { valid: boolean; error?: string } {
   if (!name || typeof name !== 'string') {
     return { valid: false, error: 'Package name cannot be empty' };
   }
 
-  // Decode URL encoding before validation
   let decoded = name;
   try {
     decoded = decodeURIComponent(name);
   } catch {
-    // If decoding fails, use original
+    // Use original
   }
 
   if (decoded.length > MAX_PACKAGE_NAME_LENGTH) {
     return { valid: false, error: `Package name too long (max ${MAX_PACKAGE_NAME_LENGTH} characters)` };
   }
 
-  // Check for null bytes (security)
   if (decoded.includes('\0')) {
     return { valid: false, error: 'Invalid characters in package name' };
   }
 
-  // Check for path traversal attempts (including encoded variants)
   const hasPathTraversal = decoded.includes('..') ||
     decoded.includes('\\') ||
     decoded.includes('%2e') ||
@@ -77,7 +73,6 @@ function validatePackageName(name: string): { valid: boolean; error?: string } {
     return { valid: false, error: 'Invalid characters in package name' };
   }
 
-  // Package name pattern: optional @scope/ followed by package name
   const packageNameRegex = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
   if (!packageNameRegex.test(name.toLowerCase())) {
     return { valid: false, error: 'Invalid package name format' };
@@ -118,15 +113,12 @@ async function resolveTargetPlatforms(options: InstallOptions): Promise<Platform
     return [options.platform];
   }
 
-  // Auto-detect installed platforms
   let platforms = await getDetectedPlatforms();
 
-  // Default to claude-code if nothing detected
   if (platforms.length === 0) {
     platforms = ['claude-code'];
   }
 
-  // Filter to only claude-code for MVP
   platforms = platforms.filter(p => p === 'claude-code');
   if (platforms.length === 0) {
     platforms = ['claude-code'];
@@ -140,35 +132,15 @@ async function resolveTargetPlatforms(options: InstallOptions): Promise<Platform
  */
 async function installToPlatforms(
   manifest: PackageManifest,
-  packagePath: string,
+  tempDir: string | undefined,
   platforms: Platform[]
 ): Promise<InstallResult[]> {
   return Promise.all(
     platforms.map(async (platform) => {
       const adapter = getAdapter(platform);
-      return adapter.install(manifest, process.cwd(), packagePath);
+      return adapter.install(manifest, process.cwd(), tempDir);
     })
   );
-}
-
-/**
- * Save installation to lockfile
- */
-async function saveInstallation(
-  manifest: PackageManifest,
-  packagePath: string,
-  successfulPlatforms: Platform[]
-): Promise<void> {
-  const installedPkg: InstalledPackage = {
-    name: manifest.name,
-    version: manifest.version,
-    type: manifest.type,
-    platforms: successfulPlatforms,
-    installedAt: new Date().toISOString(),
-    path: packagePath,
-  };
-
-  await addInstalledPackage(installedPkg);
 }
 
 /**
@@ -178,19 +150,16 @@ function displaySuccessMessage(
   manifest: PackageManifest,
   successfulResults: InstallResult[]
 ): void {
-  // Show package info
-  console.log(chalk.dim(`\n  ${manifest.description}`));
+  logger.log(chalk.dim(`\n  ${manifest.description}`));
 
-  // Show what was created
-  console.log(chalk.dim('\n  Files created:'));
+  logger.log(chalk.dim('\n  Files created:'));
   for (const result of successfulResults) {
     for (const file of result.filesWritten) {
-      console.log(chalk.dim(`    + ${path.relative(process.cwd(), file)}`));
+      logger.log(chalk.dim(`    + ${path.relative(process.cwd(), file)}`));
     }
   }
 
-  // Show usage hints based on package type
-  console.log('');
+  logger.newline();
   displayUsageHints(manifest);
 }
 
@@ -201,39 +170,32 @@ function displayUsageHints(manifest: PackageManifest): void {
   switch (manifest.type) {
     case 'skill':
       if (manifest.skill?.command) {
-        console.log(
+        logger.log(
           `  ${chalk.cyan('Usage:')} Type ${chalk.yellow(manifest.skill.command)} in Claude Code`
         );
       }
       break;
 
     case 'rules':
-      console.log(
+      logger.log(
         `  ${chalk.cyan('Usage:')} Rules are automatically applied to matching files`
       );
       break;
 
     case 'mcp':
-      console.log(
+      logger.log(
         `  ${chalk.cyan('Usage:')} MCP server configured. Restart Claude Code to activate.`
       );
-      displayMcpEnvVars(manifest);
+      if (manifest.mcp?.env) {
+        const envVars = Object.keys(manifest.mcp.env);
+        if (envVars.length > 0) {
+          logger.log(chalk.yellow(`\n  Required environment variables:`));
+          for (const envVar of envVars) {
+            logger.log(chalk.dim(`    - ${envVar}`));
+          }
+        }
+      }
       break;
-  }
-}
-
-/**
- * Display required MCP environment variables
- */
-function displayMcpEnvVars(manifest: PackageManifest): void {
-  if (!manifest.mcp?.env) return;
-
-  const envVars = Object.keys(manifest.mcp.env);
-  if (envVars.length === 0) return;
-
-  console.log(chalk.yellow(`\n  Required environment variables:`));
-  for (const envVar of envVars) {
-    console.log(chalk.dim(`    - ${envVar}`));
   }
 }
 
@@ -243,18 +205,10 @@ function displayMcpEnvVars(manifest: PackageManifest): void {
 function displayWarnings(failedResults: InstallResult[]): void {
   if (failedResults.length === 0) return;
 
-  console.log(chalk.yellow('\n  Warnings:'));
+  logger.log(chalk.yellow('\n  Warnings:'));
   for (const result of failedResults) {
-    console.log(chalk.yellow(`    - ${result.platform}: ${result.error}`));
+    logger.log(chalk.yellow(`    - ${result.platform}: ${result.error}`));
   }
-}
-
-/**
- * Show package not found message with suggestions
- */
-function showNotFoundMessage(packageName: string): void {
-  console.log(chalk.dim('\nTry searching for packages:'));
-  console.log(chalk.dim(`  cpm search ${packageName.replace('@official/', '')}`));
 }
 
 // ============================================================================
@@ -268,78 +222,86 @@ export async function installCommand(
   packageName: string,
   options: InstallOptions
 ): Promise<void> {
-  // Step 1: Validate package name
   const validation = validatePackageName(packageName);
   if (!validation.valid) {
-    console.error(chalk.red(`Invalid package name: ${validation.error}`));
+    logger.error(`Invalid package name: ${validation.error}`);
     return;
   }
 
-  const spinner = ora(`Installing ${chalk.cyan(packageName)}...`).start();
+  const spinner = logger.isQuiet() ? null : ora(`Installing ${chalk.cyan(packageName)}...`).start();
+  let tempDir: string | undefined;
 
   try {
-    // Step 2: Normalize and find package
+    // Find package in registry
     const normalizedName = normalizePackageName(packageName);
-    spinner.text = `Searching for ${chalk.cyan(normalizedName)}...`;
+    if (spinner) spinner.text = `Searching for ${chalk.cyan(normalizedName)}...`;
 
     const pkg = await registry.getPackage(normalizedName);
     if (!pkg) {
-      spinner.fail(`Package ${chalk.red(normalizedName)} not found`);
-      showNotFoundMessage(packageName);
+      if (spinner) spinner.fail(`Package ${chalk.red(normalizedName)} not found`);
+      else logger.error(`Package ${normalizedName} not found`);
+      logger.log(chalk.dim('\nTry searching for packages:'));
+      logger.log(chalk.dim(`  cpm search ${packageName.replace('@official/', '')}`));
       return;
     }
 
-    // Step 3: Download package
-    spinner.text = `Downloading ${chalk.cyan(pkg.name)}@${pkg.version}...`;
+    // Download package
+    if (spinner) spinner.text = `Downloading ${chalk.cyan(pkg.name)}@${pkg.version}...`;
     const downloadResult = await downloadPackage(pkg);
 
     if (!downloadResult.success) {
-      spinner.fail(`Failed to download ${pkg.name}: ${downloadResult.error}`);
+      if (spinner) spinner.fail(`Failed to download ${pkg.name}: ${downloadResult.error}`);
+      else logger.error(`Failed to download ${pkg.name}: ${downloadResult.error}`);
       return;
     }
 
-    // Step 4: Resolve target platforms
+    tempDir = downloadResult.tempDir;
+
+    // Resolve platforms
     const targetPlatforms = await resolveTargetPlatforms(options);
     if (!targetPlatforms) {
-      spinner.fail(`Invalid platform: ${options.platform}`);
-      console.log(chalk.dim(`Valid platforms: ${VALID_PLATFORMS.join(', ')}`));
+      if (spinner) spinner.fail(`Invalid platform: ${options.platform}`);
+      else logger.error(`Invalid platform: ${options.platform}`);
+      logger.log(chalk.dim(`Valid platforms: ${VALID_PLATFORMS.join(', ')}`));
       return;
     }
 
-    // Step 5: Install to platforms
-    spinner.text = `Installing to ${targetPlatforms.join(', ')}...`;
-    await ensureCpmDir();
+    // Install to ~/.claude/
+    if (spinner) spinner.text = `Installing to ${targetPlatforms.join(', ')}...`;
+    await ensureClaudeDirs();
 
     const results = await installToPlatforms(
       downloadResult.manifest,
-      downloadResult.packagePath,
+      tempDir,
       targetPlatforms
     );
 
-    // Step 6: Process results
     const successful = results.filter(r => r.success);
     const failed = results.filter(r => !r.success);
 
     if (successful.length > 0) {
-      await saveInstallation(
-        downloadResult.manifest,
-        downloadResult.packagePath,
-        successful.map(r => r.platform) as Platform[]
-      );
-
-      spinner.succeed(
-        `Installed ${chalk.green(downloadResult.manifest.name)}@${chalk.dim(downloadResult.manifest.version)}`
-      );
-
+      if (spinner) {
+        spinner.succeed(
+          `Installed ${chalk.green(downloadResult.manifest.name)}@${chalk.dim(downloadResult.manifest.version)}`
+        );
+      } else {
+        logger.success(`Installed ${downloadResult.manifest.name}@${downloadResult.manifest.version}`);
+      }
       displaySuccessMessage(downloadResult.manifest, successful);
     }
 
     displayWarnings(failed);
 
   } catch (error) {
-    spinner.fail(`Failed to install ${packageName}`);
+    if (spinner) spinner.fail(`Failed to install ${packageName}`);
+    else logger.error(`Failed to install ${packageName}`);
     if (error instanceof Error) {
-      console.error(chalk.red(`\n  ${error.message}`));
+      logger.error(error.message);
+    }
+  } finally {
+    // Clean up temp directory
+    if (tempDir) {
+      await cleanupTempDir(tempDir);
     }
   }
 }
