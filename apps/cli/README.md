@@ -83,50 +83,6 @@ cpm --help          # Show help
 | `skill` | Slash commands    | `~/.claude/skills/<name>/` |
 | `mcp`   | MCP servers       | `~/.claude.json`           |
 
-## Development
-
-```bash
-# Install dependencies
-pnpm install
-
-# Build
-pnpm build
-
-# Run tests
-pnpm test
-
-# Type check
-pnpm typecheck
-
-# Run in dev mode
-pnpm dev
-```
-
-## Architecture
-
-```
-src/
-├── index.ts              # CLI entry point (commander setup)
-├── commands/             # Command implementations
-│   ├── install.ts        # Install command
-│   ├── uninstall.ts      # Uninstall command
-│   ├── search.ts         # Search command
-│   ├── list.ts           # List command
-│   └── init.ts           # Init command
-├── adapters/             # Platform adapters
-│   ├── base.ts           # Base adapter interface
-│   ├── index.ts          # Adapter factory
-│   └── claude-code.ts    # Claude Code adapter
-├── utils/                # Utilities
-│   ├── logger.ts         # Production logger (consola)
-│   ├── config.ts         # Configuration helpers
-│   ├── downloader.ts     # Package downloader
-│   ├── registry.ts       # Registry client
-│   ├── platform.ts       # Platform detection
-│   └── embedded-packages.ts  # Fallback manifests
-└── types.ts              # Type definitions
-```
-
 ## Security
 
 The CLI implements several security measures:

@@ -6,7 +6,7 @@
 
 ```bash
 # Install a package
-cpm install @cpm/commit
+cpm install @cpmai/commit
 
 # Search for packages
 cpm search react
@@ -26,11 +26,7 @@ CPM is a CLI tool that lets you install curated packages for [Claude Code](https
 ## Installation
 
 ```bash
-# Using npm
-npm install -g @cpm/cli
-
-# Using pnpm
-pnpm add -g @cpm/cli
+npm install -g @cpmai/cli
 ```
 
 ## Usage
@@ -42,7 +38,7 @@ pnpm add -g @cpm/cli
 cpm install commit
 
 # Install with full package name
-cpm install @cpm/nextjs-rules
+cpm install @cpmai/nextjs-rules
 
 # Install community package
 cpm install @community/some-package
@@ -95,47 +91,11 @@ cpm --help
 
 ## Package Types
 
-| Type | Description | Installation Location |
-|------|-------------|----------------------|
-| `rules` | Coding guidelines and standards | `~/.claude/rules/<name>/` |
-| `skill` | Slash commands for Claude Code | `~/.claude/skills/<name>/` |
-| `mcp` | MCP server integrations | `~/.claude.json` |
-
-## Architecture
-
-CPM follows a simple, stateless design:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                         CPM CLI                              │
-│                                                              │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │
-│  │ install  │  │  search  │  │   list   │  │uninstall │    │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘    │
-│       │             │             │             │           │
-│       ▼             ▼             │             │           │
-│  ┌─────────────────────────┐      │             │           │
-│  │    Registry Client      │      │             │           │
-│  │  (GitHub-based registry)│      │             │           │
-│  └───────────┬─────────────┘      │             │           │
-│              │                    │             │           │
-│              ▼                    ▼             ▼           │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │              Claude Code Adapter                     │   │
-│  │                                                      │   │
-│  │  ~/.claude/rules/     - Rules directories           │   │
-│  │  ~/.claude/skills/    - Skill directories           │   │
-│  │  ~/.claude.json       - MCP server config           │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Key Design Decisions
-
-- **No caching** - Packages are downloaded fresh each time, installed directly
-- **No lockfile** - Installation state is determined by scanning `~/.claude/`
-- **Stateless** - No local `.cpm/` directory needed in projects
-- **Security first** - MCP command allowlist, path traversal prevention, file sanitization
+| Type    | Description                     | Installation Location      |
+| ------- | ------------------------------- | -------------------------- |
+| `rules` | Coding guidelines and standards | `~/.claude/rules/<name>/`  |
+| `skill` | Slash commands for Claude Code  | `~/.claude/skills/<name>/` |
+| `mcp`   | MCP server integrations         | `~/.claude.json`           |
 
 ## Development
 
@@ -148,7 +108,7 @@ CPM follows a simple, stateless design:
 
 ```bash
 # Clone the repo
-git clone https://github.com/cpm-ai/cpm.git
+git clone https://github.com/cpmai-dev/cpm.git
 cd cpm
 
 # Install dependencies
@@ -160,48 +120,13 @@ pnpm build
 
 ### Commands
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start CLI in dev mode |
-| `pnpm build` | Build all packages |
-| `pnpm test` | Run tests |
+| Command          | Description             |
+| ---------------- | ----------------------- |
+| `pnpm dev`       | Start CLI in dev mode   |
+| `pnpm build`     | Build all packages      |
+| `pnpm test`      | Run tests               |
 | `pnpm typecheck` | Type-check all packages |
-| `pnpm lint` | Lint all packages |
-
-### Testing
-
-```bash
-# Run all tests
-pnpm test
-
-# Run tests in watch mode
-pnpm test:watch
-
-# Run tests with coverage
-pnpm test:coverage
-```
-
-### Project Structure
-
-```
-cpm/
-├── apps/
-│   └── cli/                  # CLI tool (@cpm/cli)
-│       ├── src/
-│       │   ├── commands/     # CLI commands (install, search, list, etc.)
-│       │   ├── adapters/     # Platform adapters (claude-code)
-│       │   ├── utils/        # Utilities (logger, config, downloader)
-│       │   └── __tests__/    # Test files
-│       └── package.json
-│
-├── packages/
-│   ├── types/                # Shared TypeScript types
-│   └── registry-client/      # Registry API client
-│
-├── turbo.json                # Turborepo config
-├── pnpm-workspace.yaml       # pnpm workspaces
-└── package.json              # Root package.json
-```
+| `pnpm lint`      | Lint all packages       |
 
 ## Security
 
