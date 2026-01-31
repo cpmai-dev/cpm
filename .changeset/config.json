@@ -6,6 +6,5 @@
   "linked": [],
   "access": "public",
   "baseBranch": "main",
-  "updateInternalDependencies": "patch",
-  "ignore": ["@cpm/types", "@cpm/registry-client"]
+  "updateInternalDependencies": "patch"
 }

@@ -1,6 +1,7 @@
 {
   "name": "@cpm/registry-client",
   "version": "0.1.0",
+  "private": true,
   "description": "Registry client for CPM - fetches packages from GitHub-based registry",
   "type": "module",
   "main": "./dist/index.js",
