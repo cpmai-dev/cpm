@@ -1,7 +1,7 @@
-import chalk from 'chalk';
-import fs from 'fs-extra';
-import path from 'path';
-import { logger } from '../utils/logger.js';
+import chalk from "chalk";
+import fs from "fs-extra";
+import path from "path";
+import { logger } from "../utils/logger.js";
 
 interface InitOptions {
   yes?: boolean;
@@ -62,28 +62,32 @@ universal:
 #     API_KEY: "\${API_KEY}"
 `;
 
-export async function initCommand(options: InitOptions): Promise<void> {
-  const manifestPath = path.join(process.cwd(), 'cpm.yaml');
+export async function initCommand(_options: InitOptions): Promise<void> {
+  const manifestPath = path.join(process.cwd(), "cpm.yaml");
 
   // Check if already exists
   if (await fs.pathExists(manifestPath)) {
-    logger.warn('cpm.yaml already exists in this directory');
+    logger.warn("cpm.yaml already exists in this directory");
     return;
   }
 
   try {
     // Write template
-    await fs.writeFile(manifestPath, TEMPLATE, 'utf-8');
+    await fs.writeFile(manifestPath, TEMPLATE, "utf-8");
 
-    logger.success('Created cpm.yaml');
+    logger.success("Created cpm.yaml");
     logger.newline();
-    logger.log('Next steps:');
-    logger.log(chalk.dim('  1. Edit cpm.yaml to configure your package'));
-    logger.log(chalk.dim('  2. Run cpm publish to publish to the registry'));
+    logger.log("Next steps:");
+    logger.log(chalk.dim("  1. Edit cpm.yaml to configure your package"));
+    logger.log(chalk.dim("  2. Run cpm publish to publish to the registry"));
     logger.newline();
-    logger.log(chalk.dim(`Learn more: ${chalk.cyan('https://cpm-ai.dev/docs/publishing')}`));
+    logger.log(
+      chalk.dim(
+        `Learn more: ${chalk.cyan("https://cpm-ai.dev/docs/publishing")}`,
+      ),
+    );
   } catch (error) {
-    logger.error('Failed to create cpm.yaml');
-    logger.error(error instanceof Error ? error.message : 'Unknown error');
+    logger.error("Failed to create cpm.yaml");
+    logger.error(error instanceof Error ? error.message : "Unknown error");
   }
 }

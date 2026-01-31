@@ -2,22 +2,28 @@
  * Package downloader utilities
  * Downloads packages directly without caching
  */
-import got from 'got';
-import fs from 'fs-extra';
-import path from 'path';
-import os from 'os';
-import * as tar from 'tar';
-import yaml from 'yaml';
-import type { RegistryPackage, PackageManifest, PackageType } from '../types.js';
-import { resolvePackageType } from '../types.js';
-import { getEmbeddedManifest } from './embedded-packages.js';
-import { logger } from './logger.js';
+import got from "got";
+import fs from "fs-extra";
+import path from "path";
+import os from "os";
+import * as tar from "tar";
+import yaml from "yaml";
+import type {
+  RegistryPackage,
+  PackageManifest,
+  PackageType,
+} from "../types.js";
+import { resolvePackageType } from "../types.js";
+import { getEmbeddedManifest } from "./embedded-packages.js";
+import { logger } from "./logger.js";
 
 /** Temporary directory for downloads */
-const TEMP_DIR = path.join(os.tmpdir(), 'cpm-downloads');
+const TEMP_DIR = path.join(os.tmpdir(), "cpm-downloads");
 
 /** Base URL for packages registry (configurable via env) */
-const PACKAGES_BASE_URL = process.env.CPM_PACKAGES_URL || 'https://raw.githubusercontent.com/cpmai-dev/packages/main';
+const PACKAGES_BASE_URL =
+  process.env.CPM_PACKAGES_URL ||
+  "https://raw.githubusercontent.com/cpmai-dev/packages/main";
 
 /** Request timeout constants (ms) */
 const TIMEOUTS = {
@@ -34,9 +40,9 @@ const TIMEOUTS = {
  * Validate and sanitize a file name to prevent path traversal
  */
 function sanitizeFileName(fileName: string): string {
-  const sanitized = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, '_');
+  const sanitized = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, "_");
 
-  if (!sanitized || sanitized.includes('..') || sanitized.startsWith('.')) {
+  if (!sanitized || sanitized.includes("..") || sanitized.startsWith(".")) {
     throw new Error(`Invalid file name: ${fileName}`);
   }
 
@@ -50,7 +56,10 @@ function validatePathWithinDir(destPath: string, allowedDir: string): void {
   const resolvedDest = path.resolve(destPath);
   const resolvedDir = path.resolve(allowedDir);
 
-  if (!resolvedDest.startsWith(resolvedDir + path.sep) && resolvedDest !== resolvedDir) {
+  if (
+    !resolvedDest.startsWith(resolvedDir + path.sep) &&
+    resolvedDest !== resolvedDir
+  ) {
     throw new Error(`Path traversal detected: ${destPath}`);
   }
 }
@@ -59,9 +68,9 @@ function validatePathWithinDir(destPath: string, allowedDir: string): void {
  * Validate and sanitize a package path from registry
  */
 function validatePackagePath(pkgPath: string): string {
-  const normalized = path.normalize(pkgPath).replace(/\\/g, '/');
+  const normalized = path.normalize(pkgPath).replace(/\\/g, "/");
 
-  if (normalized.includes('..') || normalized.startsWith('/')) {
+  if (normalized.includes("..") || normalized.startsWith("/")) {
     throw new Error(`Invalid package path: ${pkgPath}`);
   }
 
@@ -87,12 +96,17 @@ export interface DownloadResult {
  * Download a package from the registry
  * Returns manifest and temporary directory with files
  */
-export async function downloadPackage(pkg: RegistryPackage): Promise<DownloadResult> {
+export async function downloadPackage(
+  pkg: RegistryPackage,
+): Promise<DownloadResult> {
   try {
     await fs.ensureDir(TEMP_DIR);
 
     // Create temp directory for this package
-    const packageTempDir = path.join(TEMP_DIR, `${pkg.name.replace(/[@\/]/g, '_')}-${Date.now()}`);
+    const packageTempDir = path.join(
+      TEMP_DIR,
+      `${pkg.name.replace(/[@/]/g, "_")}-${Date.now()}`,
+    );
     await fs.ensureDir(packageTempDir);
 
     let manifest: PackageManifest | null = null;
@@ -123,7 +137,7 @@ export async function downloadPackage(pkg: RegistryPackage): Promise<DownloadRes
     return {
       success: false,
       manifest: {} as PackageManifest,
-      error: error instanceof Error ? error.message : 'Download failed',
+      error: error instanceof Error ? error.message : "Download failed",
     };
   }
 }
@@ -148,9 +162,11 @@ export async function cleanupTempDir(tempDir: string): Promise<void> {
 /**
  * Fetch manifest from GitHub repository
  */
-async function fetchManifestFromRepo(repoUrl: string): Promise<PackageManifest | null> {
+async function fetchManifestFromRepo(
+  repoUrl: string,
+): Promise<PackageManifest | null> {
   try {
-    const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+    const match = repoUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
     if (!match) return null;
 
     const [, owner, repo] = match;
@@ -171,30 +187,30 @@ async function fetchManifestFromRepo(repoUrl: string): Promise<PackageManifest |
  */
 async function downloadAndExtractTarball(
   pkg: RegistryPackage,
-  tempDir: string
+  tempDir: string,
 ): Promise<PackageManifest | null> {
   if (!pkg.tarball) return null;
 
   try {
     // Enforce HTTPS for security
     const parsedUrl = new URL(pkg.tarball);
-    if (parsedUrl.protocol !== 'https:') {
-      throw new Error('Only HTTPS URLs are allowed for downloads');
+    if (parsedUrl.protocol !== "https:") {
+      throw new Error("Only HTTPS URLs are allowed for downloads");
     }
 
     const response = await got(pkg.tarball, {
       timeout: { request: TIMEOUTS.TARBALL_DOWNLOAD },
       followRedirect: true,
-      responseType: 'buffer',
+      responseType: "buffer",
     });
 
-    const tarballPath = path.join(tempDir, 'package.tar.gz');
+    const tarballPath = path.join(tempDir, "package.tar.gz");
     await fs.writeFile(tarballPath, response.body);
     await extractTarball(tarballPath, tempDir);
 
-    const manifestPath = path.join(tempDir, 'cpm.yaml');
+    const manifestPath = path.join(tempDir, "cpm.yaml");
     if (await fs.pathExists(manifestPath)) {
-      const content = await fs.readFile(manifestPath, 'utf-8');
+      const content = await fs.readFile(manifestPath, "utf-8");
       return yaml.parse(content);
     }
     return null;
@@ -206,7 +222,10 @@ async function downloadAndExtractTarball(
 /**
  * Extract tarball to destination with zip slip protection
  */
-async function extractTarball(tarballPath: string, destDir: string): Promise<void> {
+async function extractTarball(
+  tarballPath: string,
+  destDir: string,
+): Promise<void> {
   await fs.ensureDir(destDir);
   const resolvedDestDir = path.resolve(destDir);
 
@@ -216,8 +235,9 @@ async function extractTarball(tarballPath: string, destDir: string): Promise<voi
     strip: 1,
     filter: (entryPath: string) => {
       const resolvedPath = path.resolve(destDir, entryPath);
-      const isWithinDest = resolvedPath.startsWith(resolvedDestDir + path.sep) ||
-                           resolvedPath === resolvedDestDir;
+      const isWithinDest =
+        resolvedPath.startsWith(resolvedDestDir + path.sep) ||
+        resolvedPath === resolvedDestDir;
 
       if (!isWithinDest) {
         logger.warn(`Blocked path traversal in tarball: ${entryPath}`);
@@ -233,7 +253,7 @@ async function extractTarball(tarballPath: string, destDir: string): Promise<voi
  */
 async function fetchPackageFromPath(
   pkg: RegistryPackage,
-  tempDir: string
+  tempDir: string,
 ): Promise<PackageManifest | null> {
   if (!pkg.path) return null;
 
@@ -249,10 +269,10 @@ async function fetchPackageFromPath(
     const response = await got(apiUrl, {
       timeout: { request: TIMEOUTS.API_REQUEST },
       headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': 'cpm-cli',
+        Accept: "application/vnd.github.v3+json",
+        "User-Agent": "cpm-cli",
       },
-      responseType: 'json',
+      responseType: "json",
     });
 
     const files = response.body as Array<{
@@ -261,12 +281,12 @@ async function fetchPackageFromPath(
       download_url: string | null;
     }>;
 
-    let mainContent = '';
+    let mainContent = "";
     const pkgType = resolvePackageType(pkg);
     const contentFile = getContentFileName(pkgType);
 
     for (const file of files) {
-      if (file.type === 'file' && file.download_url) {
+      if (file.type === "file" && file.download_url) {
         const safeFileName = sanitizeFileName(file.name);
         const destPath = path.join(tempDir, safeFileName);
 
@@ -276,7 +296,7 @@ async function fetchPackageFromPath(
           timeout: { request: TIMEOUTS.API_REQUEST },
         });
 
-        await fs.writeFile(destPath, fileResponse.body, 'utf-8');
+        await fs.writeFile(destPath, fileResponse.body, "utf-8");
 
         if (file.name === contentFile) {
           mainContent = fileResponse.body;
@@ -293,7 +313,9 @@ async function fetchPackageFromPath(
 /**
  * Fallback: fetch only the main content file
  */
-async function fetchSingleFileFromPath(pkg: RegistryPackage): Promise<PackageManifest | null> {
+async function fetchSingleFileFromPath(
+  pkg: RegistryPackage,
+): Promise<PackageManifest | null> {
   if (!pkg.path) return null;
 
   try {
@@ -321,23 +343,25 @@ async function fetchSingleFileFromPath(pkg: RegistryPackage): Promise<PackageMan
  */
 function getContentFileName(type: PackageType): string {
   const fileNames: Record<string, string> = {
-    skill: 'SKILL.md',
-    rules: 'RULES.md',
-    mcp: 'MCP.md',
-    agent: 'AGENT.md',
-    hook: 'HOOK.md',
-    workflow: 'WORKFLOW.md',
-    template: 'TEMPLATE.md',
-    bundle: 'BUNDLE.md',
+    skill: "SKILL.md",
+    rules: "RULES.md",
+    mcp: "MCP.md",
+    agent: "AGENT.md",
+    hook: "HOOK.md",
+    workflow: "WORKFLOW.md",
+    template: "TEMPLATE.md",
+    bundle: "BUNDLE.md",
   };
-  return fileNames[type] || 'README.md';
+  return fileNames[type] || "README.md";
 }
 
 /**
  * Parse GitHub repo info from URL
  */
-function parseGitHubInfo(baseUrl: string): { owner: string; repo: string } | null {
-  const match = baseUrl.match(/github(?:usercontent)?\.com\/([^\/]+)\/([^\/]+)/);
+function parseGitHubInfo(
+  baseUrl: string,
+): { owner: string; repo: string } | null {
+  const match = baseUrl.match(/github(?:usercontent)?\.com\/([^/]+)\/([^/]+)/);
   if (!match) return null;
   return { owner: match[1], repo: match[2] };
 }
@@ -345,7 +369,10 @@ function parseGitHubInfo(baseUrl: string): { owner: string; repo: string } | nul
 /**
  * Create manifest from registry data with content
  */
-function createManifestWithContent(pkg: RegistryPackage, content: string): PackageManifest {
+function createManifestWithContent(
+  pkg: RegistryPackage,
+  content: string,
+): PackageManifest {
   const pkgType = resolvePackageType(pkg);
   return {
     name: pkg.name,
@@ -358,10 +385,13 @@ function createManifestWithContent(pkg: RegistryPackage, content: string): Packa
       rules: content,
       prompt: content,
     },
-    skill: pkgType === 'skill' ? {
-      command: `/${pkg.name.split('/').pop()}`,
-      description: pkg.description,
-    } : undefined,
+    skill:
+      pkgType === "skill"
+        ? {
+            command: `/${pkg.name.split("/").pop()}`,
+            description: pkg.description,
+          }
+        : undefined,
   };
 }
 
