@@ -1,6 +1,6 @@
 import fs from 'fs-extra';
 import path from 'path';
-import type { PackageManifest } from '../types.js';
+import type { PackageManifest, PackageMetadata } from '../types.js';
 import { PlatformAdapter, InstallResult } from './base.js';
 import { getRulesPath, getSkillsPath, getClaudeCodeHome } from '../utils/platform.js';
 import { logger } from '../utils/logger.js';
@@ -177,6 +177,30 @@ function isPathWithinDirectory(filePath: string, directory: string): boolean {
   return resolvedPath.startsWith(resolvedDir + path.sep) || resolvedPath === resolvedDir;
 }
 
+/**
+ * Write package metadata to the package folder
+ * Non-critical - failures are logged but don't block installation
+ */
+async function writePackageMetadata(
+  packageDir: string,
+  manifest: PackageManifest
+): Promise<string> {
+  const metadata: PackageMetadata = {
+    name: manifest.name,
+    version: manifest.version,
+    type: manifest.type || 'unknown',
+    installedAt: new Date().toISOString(),
+  };
+
+  const metadataPath = path.join(packageDir, '.cpm.json');
+  try {
+    await fs.writeJson(metadataPath, metadata, { spaces: 2 });
+  } catch (error) {
+    logger.warn(`Could not write metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+  return metadataPath;
+}
+
 export class ClaudeCodeAdapter extends PlatformAdapter {
   platform = 'claude-code' as const;
   displayName = 'Claude Code';
@@ -345,6 +369,11 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
           await fs.copy(srcPath, destPath);
           filesWritten.push(destPath);
         }
+
+        // Write package metadata
+        const metadataPath = await writePackageMetadata(rulesDir, manifest);
+        filesWritten.push(metadataPath);
+
         return filesWritten;
       }
     }
@@ -358,6 +387,10 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
 
     await fs.writeFile(rulesPath, content, 'utf-8');
     filesWritten.push(rulesPath);
+
+    // Write package metadata
+    const metadataPath = await writePackageMetadata(rulesDir, manifest);
+    filesWritten.push(metadataPath);
 
     return filesWritten;
   }
@@ -397,6 +430,11 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
           await fs.copy(srcPath, destPath);
           filesWritten.push(destPath);
         }
+
+        // Write package metadata
+        const metadataPath = await writePackageMetadata(skillDir, manifest);
+        filesWritten.push(metadataPath);
+
         return filesWritten;
       }
     }
@@ -407,6 +445,10 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
       const skillPath = path.join(skillDir, 'SKILL.md');
       await fs.writeFile(skillPath, skillContent, 'utf-8');
       filesWritten.push(skillPath);
+
+      // Write package metadata
+      const metadataPath = await writePackageMetadata(skillDir, manifest);
+      filesWritten.push(metadataPath);
     } else if (manifest.universal?.prompt || manifest.universal?.rules) {
       // Create basic skill from universal content
       const content = manifest.universal.prompt || manifest.universal.rules || '';
@@ -414,6 +456,10 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
       const skillContent = `# ${manifest.name}\n\n${manifest.description}\n\n${content.trim()}\n`;
       await fs.writeFile(skillPath, skillContent, 'utf-8');
       filesWritten.push(skillPath);
+
+      // Write package metadata
+      const metadataPath = await writePackageMetadata(skillDir, manifest);
+      filesWritten.push(metadataPath);
     }
 
     return filesWritten;

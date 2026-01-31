@@ -67,7 +67,7 @@ export interface RegistryPackage {
   description: string;
   type?: PackageType;  // Optional - can be derived from path
   author: string;
-  downloads: number;
+  downloads?: number;  // Optional - defaults to 0
   path?: string;
   stars?: number;
   verified?: boolean;
@@ -109,4 +109,14 @@ export function resolvePackageType(pkg: RegistryPackage): PackageType {
 export interface SearchResult {
   packages: RegistryPackage[];
   total: number;
+}
+
+/**
+ * Package metadata stored in each installed package folder (.cpm.json)
+ */
+export interface PackageMetadata {
+  name: string;
+  version: string;
+  type: string;
+  installedAt: string;
 }

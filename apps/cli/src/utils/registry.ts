@@ -124,9 +124,9 @@ export class Registry {
     if (options.query) {
       const query = options.query.toLowerCase();
       packages = packages.filter(pkg =>
-        pkg.name.toLowerCase().includes(query) ||
-        pkg.description.toLowerCase().includes(query) ||
-        (pkg.keywords?.some(k => k.toLowerCase().includes(query)))
+        pkg.name?.toLowerCase().includes(query) ||
+        pkg.description?.toLowerCase().includes(query) ||
+        pkg.keywords?.some(k => k?.toLowerCase().includes(query))
       );
     }
 
@@ -146,13 +146,13 @@ export class Registry {
     packages.sort((a, b) => {
       switch (sort) {
         case 'downloads':
-          return b.downloads - a.downloads;
+          return (b.downloads ?? 0) - (a.downloads ?? 0);
         case 'stars':
           return (b.stars ?? 0) - (a.stars ?? 0);
         case 'recent':
           return new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime();
         case 'name':
-          return a.name.localeCompare(b.name);
+          return (a.name ?? '').localeCompare(b.name ?? '');
         default:
           return 0;
       }

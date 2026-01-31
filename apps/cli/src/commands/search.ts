@@ -38,7 +38,8 @@ export async function searchCommand(
   options: SearchOptions
 ): Promise<void> {
   const spinner = logger.isQuiet() ? null : ora(`Searching for "${query}"...`).start();
-  const limit = parseInt(options.limit || '10', 10);
+  const parsedLimit = parseInt(options.limit || '10', 10);
+  const limit = Number.isNaN(parsedLimit) ? 10 : Math.max(1, Math.min(parsedLimit, 100));
 
   try {
     // Build search options
@@ -90,10 +91,10 @@ export async function searchCommand(
       // Description
       logger.log(`   ${chalk.dim(pkg.description)}`);
 
-      // Metadata line (handle optional stars)
+      // Metadata line (handle optional downloads and stars)
       const meta = [
         typeColor(pkgType),
-        chalk.dim(`↓ ${formatNumber(pkg.downloads)}`),
+        chalk.dim(`↓ ${formatNumber(pkg.downloads ?? 0)}`),
         pkg.stars !== undefined ? chalk.dim(`★ ${pkg.stars}`) : null,
         chalk.dim(`@${pkg.author}`),
       ].filter(Boolean) as string[];

@@ -7,9 +7,13 @@ import path from 'path';
 import os from 'os';
 import { logger } from '../utils/logger.js';
 
+import type { PackageMetadata } from '../types.js';
+
 interface InstalledItem {
-  name: string;
+  name: string;           // Full package name (e.g., @author/package)
+  folderName: string;     // Folder name for uninstall
   type: 'rules' | 'skill' | 'mcp';
+  version?: string;
   path: string;
 }
 
@@ -18,6 +22,21 @@ const typeColors: Record<string, (str: string) => string> = {
   skill: chalk.blue,
   mcp: chalk.magenta,
 };
+
+/**
+ * Read package metadata from .cpm.json file
+ */
+async function readPackageMetadata(packageDir: string): Promise<PackageMetadata | null> {
+  const metadataPath = path.join(packageDir, '.cpm.json');
+  try {
+    if (await fs.pathExists(metadataPath)) {
+      return await fs.readJson(metadataPath);
+    }
+  } catch {
+    // Ignore read errors
+  }
+  return null;
+}
 
 /**
  * Scan ~/.claude/ directories to find installed packages
@@ -34,9 +53,12 @@ async function scanInstalledPackages(): Promise<InstalledItem[]> {
       const entryPath = path.join(rulesDir, entry);
       const stat = await fs.stat(entryPath);
       if (stat.isDirectory()) {
+        const metadata = await readPackageMetadata(entryPath);
         items.push({
-          name: entry,
+          name: metadata?.name || entry,
+          folderName: entry,
           type: 'rules',
+          version: metadata?.version,
           path: entryPath,
         });
       }
@@ -51,9 +73,12 @@ async function scanInstalledPackages(): Promise<InstalledItem[]> {
       const skillPath = path.join(skillsDir, dir);
       const stat = await fs.stat(skillPath);
       if (stat.isDirectory()) {
+        const metadata = await readPackageMetadata(skillPath);
         items.push({
-          name: dir,
+          name: metadata?.name || dir,
+          folderName: dir,
           type: 'skill',
+          version: metadata?.version,
           path: skillPath,
         });
       }
@@ -69,6 +94,7 @@ async function scanInstalledPackages(): Promise<InstalledItem[]> {
       for (const name of Object.keys(mcpServers)) {
         items.push({
           name,
+          folderName: name,
           type: 'mcp',
           path: mcpConfigPath,
         });
@@ -93,14 +119,11 @@ export async function listCommand(): Promise<void> {
 
     logger.log(chalk.bold(`\nInstalled packages (${packages.length}):\n`));
 
-    // Group by type
-    const byType: Record<string, InstalledItem[]> = {};
-    for (const pkg of packages) {
-      if (!byType[pkg.type]) {
-        byType[pkg.type] = [];
-      }
-      byType[pkg.type].push(pkg);
-    }
+    // Group by type (immutable pattern)
+    const byType = packages.reduce<Record<string, InstalledItem[]>>((acc, pkg) => ({
+      ...acc,
+      [pkg.type]: [...(acc[pkg.type] || []), pkg],
+    }), {});
 
     // Display by type
     for (const [type, items] of Object.entries(byType)) {
@@ -108,12 +131,14 @@ export async function listCommand(): Promise<void> {
       logger.log(typeColor(`  ${type.toUpperCase()}`));
 
       for (const item of items) {
-        logger.log(`    ${chalk.green('◉')} ${chalk.bold(item.name)}`);
+        const version = item.version ? chalk.dim(` v${item.version}`) : '';
+        logger.log(`    ${chalk.green('◉')} ${chalk.bold(item.name)}${version}`);
       }
       logger.newline();
     }
 
-    logger.log(chalk.dim('Run cpm uninstall <package> to remove a package'));
+    logger.log(chalk.dim('Run cpm uninstall <package-name> to remove a package'));
+    logger.log(chalk.dim('  e.g., cpm uninstall backend-patterns'));
   } catch (error) {
     logger.error('Failed to list packages');
     logger.error(error instanceof Error ? error.message : 'Unknown error');
