@@ -1,13 +1,52 @@
-import chalk from "chalk";
+/**
+ * Init Command
+ *
+ * This module provides the init command for CPM. It creates a new cpm.yaml
+ * manifest file in the current directory.
+ *
+ * Design principles:
+ * - **Single Responsibility**: Template is separated from display logic
+ * - **Type Safety**: Options are typed even if currently minimal
+ *
+ * @example
+ * ```bash
+ * cpm init
+ * ```
+ */
+
 import fs from "fs-extra";
 import path from "path";
 import { logger } from "../utils/logger.js";
 
-interface InitOptions {
+// Import UI layer
+import { SEMANTIC_COLORS } from "./ui/index.js";
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/**
+ * Options for the init command.
+ */
+export interface InitOptions {
+  /** Skip confirmation prompts (future feature) */
   yes?: boolean;
 }
 
-const TEMPLATE = `# Package manifest for cpm
+// ============================================================================
+// Template
+// ============================================================================
+
+/**
+ * Template for a new cpm.yaml manifest file.
+ *
+ * Provides a complete starting point for package authors with:
+ * - Basic metadata fields
+ * - Author information
+ * - Universal content configuration
+ * - Commented examples for advanced features
+ */
+const MANIFEST_TEMPLATE = `# Package manifest for cpm
 # https://cpm-ai.dev/docs/packages
 
 name: my-package
@@ -60,34 +99,90 @@ universal:
 #   args: ["your-mcp-server"]
 #   env:
 #     API_KEY: "\${API_KEY}"
-`;
+` as const;
 
+// ============================================================================
+// Constants
+// ============================================================================
+
+/** The manifest filename */
+const MANIFEST_FILENAME = "cpm.yaml" as const;
+
+/** Documentation URL */
+const DOCS_URL = "https://cpm-ai.dev/docs/publishing" as const;
+
+// ============================================================================
+// Display Functions
+// ============================================================================
+
+/**
+ * Display success message with next steps.
+ */
+function displaySuccess(): void {
+  logger.success(`Created ${MANIFEST_FILENAME}`);
+  logger.newline();
+
+  logger.log("Next steps:");
+  logger.log(
+    SEMANTIC_COLORS.dim(
+      `  1. Edit ${MANIFEST_FILENAME} to configure your package`,
+    ),
+  );
+  logger.log(
+    SEMANTIC_COLORS.dim("  2. Run cpm publish to publish to the registry"),
+  );
+  logger.newline();
+
+  logger.log(
+    SEMANTIC_COLORS.dim(`Learn more: ${SEMANTIC_COLORS.highlight(DOCS_URL)}`),
+  );
+}
+
+// ============================================================================
+// Main Command Handler
+// ============================================================================
+
+/**
+ * Main init command entry point.
+ *
+ * This function:
+ * 1. Checks if manifest already exists
+ * 2. Creates the manifest file with template
+ * 3. Displays next steps
+ *
+ * @param _options - Init options (for future use)
+ *
+ * @example
+ * ```typescript
+ * await initCommand({});
+ * ```
+ */
 export async function initCommand(_options: InitOptions): Promise<void> {
-  const manifestPath = path.join(process.cwd(), "cpm.yaml");
+  // -------------------------------------------------------------------------
+  // Step 1: Determine manifest path
+  // -------------------------------------------------------------------------
+  const manifestPath = path.join(process.cwd(), MANIFEST_FILENAME);
 
-  // Check if already exists
+  // -------------------------------------------------------------------------
+  // Step 2: Check if manifest already exists
+  // -------------------------------------------------------------------------
   if (await fs.pathExists(manifestPath)) {
-    logger.warn("cpm.yaml already exists in this directory");
+    logger.warn(`${MANIFEST_FILENAME} already exists in this directory`);
     return;
   }
 
   try {
-    // Write template
-    await fs.writeFile(manifestPath, TEMPLATE, "utf-8");
+    // -----------------------------------------------------------------------
+    // Step 3: Write template file
+    // -----------------------------------------------------------------------
+    await fs.writeFile(manifestPath, MANIFEST_TEMPLATE, "utf-8");
 
-    logger.success("Created cpm.yaml");
-    logger.newline();
-    logger.log("Next steps:");
-    logger.log(chalk.dim("  1. Edit cpm.yaml to configure your package"));
-    logger.log(chalk.dim("  2. Run cpm publish to publish to the registry"));
-    logger.newline();
-    logger.log(
-      chalk.dim(
-        `Learn more: ${chalk.cyan("https://cpm-ai.dev/docs/publishing")}`,
-      ),
-    );
+    // -----------------------------------------------------------------------
+    // Step 4: Display success and next steps
+    // -----------------------------------------------------------------------
+    displaySuccess();
   } catch (error) {
-    logger.error("Failed to create cpm.yaml");
+    logger.error(`Failed to create ${MANIFEST_FILENAME}`);
     logger.error(error instanceof Error ? error.message : "Unknown error");
   }
 }

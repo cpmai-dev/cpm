@@ -1,13 +1,27 @@
 /**
- * Install command for CPM
- * Downloads and installs packages directly to ~/.claude/
+ * Install Command
+ *
+ * This module provides the install command for CPM. It follows clean
+ * architecture principles with:
+ *
+ * - **Single Responsibility**: Each function does one thing
+ * - **Dependency Inversion**: Uses abstractions (adapters, registry)
+ * - **Open/Closed**: New display formats don't require code changes
+ *
+ * The command is a thin orchestration layer that:
+ * 1. Parses and validates input (using type guards)
+ * 2. Delegates to services (registry, downloader, adapters)
+ * 3. Formats output (using UI layer)
+ *
+ * @example
+ * ```bash
+ * cpm install typescript-strict
+ * cpm install @cpm/nextjs-rules --platform claude-code
+ * ```
  */
-import chalk from "chalk";
-import ora from "ora";
-import path from "path";
+
 import type { PackageManifest, Platform } from "../types.js";
-import { isValidPlatform } from "../types.js";
-import type { InstallResult } from "../adapters/base.js";
+import type { InstallResult as AdapterInstallResult } from "../adapters/base.js";
 import { getAdapter } from "../adapters/index.js";
 import { ensureClaudeDirs } from "../utils/config.js";
 import { registry } from "../utils/registry.js";
@@ -19,41 +33,41 @@ import {
 } from "../validation/index.js";
 import { VALID_PLATFORMS } from "../constants.js";
 
-// ============================================================================
-// Types
-// ============================================================================
+// Import UI layer
+import {
+  createSpinner,
+  spinnerText,
+  successText,
+  failText,
+  formatCreatedFiles,
+  formatUsageHints,
+  SEMANTIC_COLORS,
+} from "./ui/index.js";
 
-interface InstallOptions {
-  platform?: string;
-  version?: string;
-}
+// Import command types
+import { type RawInstallOptions, parseInstallOptions } from "./types.js";
 
 // ============================================================================
-// Installation Steps
+// Core Installation Logic
 // ============================================================================
 
 /**
- * Resolve target platforms for installation
- */
-function resolveTargetPlatforms(options: InstallOptions): Platform[] | null {
-  if (options.platform && options.platform !== "all") {
-    if (!isValidPlatform(options.platform)) {
-      return null;
-    }
-    return [options.platform];
-  }
-
-  return ["claude-code"];
-}
-
-/**
- * Install package to all target platforms
+ * Install a package to all specified platforms.
+ *
+ * Runs installation in parallel across all platforms using
+ * the appropriate adapter for each.
+ *
+ * @param manifest - The package manifest
+ * @param tempDir - Temporary directory with package files
+ * @param platforms - Target platforms for installation
+ * @returns Array of results from each platform
  */
 async function installToPlatforms(
   manifest: PackageManifest,
   tempDir: string | undefined,
-  platforms: Platform[],
-): Promise<InstallResult[]> {
+  platforms: readonly Platform[],
+): Promise<AdapterInstallResult[]> {
+  // Run all platform installations in parallel
   return Promise.all(
     platforms.map(async (platform) => {
       const adapter = getAdapter(platform);
@@ -63,168 +77,212 @@ async function installToPlatforms(
 }
 
 /**
- * Display success message with installation details
+ * Partition results into successful and failed arrays.
+ *
+ * Uses immutable pattern to separate results by success status.
+ *
+ * @param results - Array of installation results
+ * @returns Tuple of [successful, failed] results
  */
-function displaySuccessMessage(
+function partitionResults(
+  results: AdapterInstallResult[],
+): [AdapterInstallResult[], AdapterInstallResult[]] {
+  const successful = results.filter((r) => r.success);
+  const failed = results.filter((r) => !r.success);
+  return [successful, failed];
+}
+
+// ============================================================================
+// Display Functions
+// ============================================================================
+
+/**
+ * Display success message with installation details.
+ *
+ * Shows:
+ * - Package description
+ * - List of created files
+ * - Usage hints based on package type
+ *
+ * @param manifest - The installed package manifest
+ * @param results - Successful installation results
+ */
+function displaySuccess(
   manifest: PackageManifest,
-  successfulResults: InstallResult[],
+  results: AdapterInstallResult[],
 ): void {
-  logger.log(chalk.dim(`\n  ${manifest.description}`));
+  // Show package description
+  logger.log(SEMANTIC_COLORS.dim(`\n  ${manifest.description}`));
 
-  logger.log(chalk.dim("\n  Files created:"));
-  for (const result of successfulResults) {
-    for (const file of result.filesWritten) {
-      logger.log(chalk.dim(`    + ${path.relative(process.cwd(), file)}`));
-    }
-  }
+  // Show created files
+  logger.log(SEMANTIC_COLORS.dim("\n  Files created:"));
+  const allFiles = results.flatMap((r) => r.filesWritten);
+  const formattedFiles = formatCreatedFiles(allFiles);
+  formattedFiles.forEach((line) => logger.log(line));
 
+  // Show usage hints
   logger.newline();
-  displayUsageHints(manifest);
+  const hints = formatUsageHints(manifest);
+  hints.forEach((line) => logger.log(line));
 }
 
 /**
- * Display usage hints based on package type
+ * Display warnings for failed platform installations.
+ *
+ * @param results - Failed installation results
  */
-function displayUsageHints(manifest: PackageManifest): void {
-  switch (manifest.type) {
-    case "skill":
-      if ("skill" in manifest && manifest.skill?.command) {
-        logger.log(
-          `  ${chalk.cyan("Usage:")} Type ${chalk.yellow(manifest.skill.command)} in Claude Code`,
-        );
-      }
-      break;
+function displayWarnings(results: AdapterInstallResult[]): void {
+  if (results.length === 0) return;
 
-    case "rules":
-      logger.log(
-        `  ${chalk.cyan("Usage:")} Rules are automatically applied to matching files`,
-      );
-      break;
-
-    case "mcp":
-      logger.log(
-        `  ${chalk.cyan("Usage:")} MCP server configured. Restart Claude Code to activate.`,
-      );
-      if ("mcp" in manifest && manifest.mcp?.env) {
-        const envVars = Object.keys(manifest.mcp.env);
-        if (envVars.length > 0) {
-          logger.log(chalk.yellow(`\n  Required environment variables:`));
-          for (const envVar of envVars) {
-            logger.log(chalk.dim(`    - ${envVar}`));
-          }
-        }
-      }
-      break;
+  logger.log(SEMANTIC_COLORS.warning("\n  Warnings:"));
+  for (const result of results) {
+    logger.log(
+      SEMANTIC_COLORS.warning(`    - ${result.platform}: ${result.error}`),
+    );
   }
 }
 
 /**
- * Display warnings for failed installations
+ * Display helpful message when package is not found.
+ *
+ * @param packageName - The package that wasn't found
  */
-function displayWarnings(failedResults: InstallResult[]): void {
-  if (failedResults.length === 0) return;
+function displayNotFound(packageName: string): void {
+  logger.log(SEMANTIC_COLORS.dim("\nTry searching for packages:"));
+  logger.log(
+    SEMANTIC_COLORS.dim(`  cpm search ${packageName.replace(/^@[^/]+\//, "")}`),
+  );
+}
 
-  logger.log(chalk.yellow("\n  Warnings:"));
-  for (const result of failedResults) {
-    logger.log(chalk.yellow(`    - ${result.platform}: ${result.error}`));
-  }
+/**
+ * Display message for invalid platform.
+ */
+function displayInvalidPlatform(): void {
+  logger.log(
+    SEMANTIC_COLORS.dim(`Valid platforms: ${VALID_PLATFORMS.join(", ")}`),
+  );
 }
 
 // ============================================================================
-// Main Command
+// Main Command Handler
 // ============================================================================
 
 /**
- * Install a package from the registry
+ * Main install command entry point.
+ *
+ * This function orchestrates the installation workflow:
+ * 1. Validate input (package name, options)
+ * 2. Look up package in registry
+ * 3. Download package manifest and files
+ * 4. Install to target platforms
+ * 5. Display results
+ * 6. Clean up temporary files
+ *
+ * @param packageName - Name of the package to install
+ * @param rawOptions - Raw CLI options (strings from parser)
+ *
+ * @example
+ * ```typescript
+ * await installCommand("typescript-strict", {});
+ * await installCommand("@cpm/rules", { platform: "claude-code" });
+ * ```
  */
 export async function installCommand(
   packageName: string,
-  options: InstallOptions,
+  rawOptions: RawInstallOptions,
 ): Promise<void> {
+  // -------------------------------------------------------------------------
+  // Step 1: Validate package name
+  // -------------------------------------------------------------------------
   const validation = validatePackageName(packageName);
   if (!validation.valid) {
     logger.error(`Invalid package name: ${validation.error}`);
     return;
   }
 
-  const spinner = logger.isQuiet()
-    ? null
-    : ora(`Installing ${chalk.cyan(packageName)}...`).start();
+  // -------------------------------------------------------------------------
+  // Step 2: Parse and validate options
+  // -------------------------------------------------------------------------
+  const options = parseInstallOptions(rawOptions);
+  if (!options) {
+    logger.error(`Invalid platform: ${rawOptions.platform}`);
+    displayInvalidPlatform();
+    return;
+  }
+
+  // -------------------------------------------------------------------------
+  // Step 3: Create progress spinner
+  // -------------------------------------------------------------------------
+  const spinner = createSpinner(spinnerText("Installing", packageName));
   let tempDir: string | undefined;
 
   try {
+    // -----------------------------------------------------------------------
+    // Step 4: Normalize package name and look up in registry
+    // -----------------------------------------------------------------------
     const normalizedName = normalizePackageName(packageName);
-    if (spinner)
-      spinner.text = `Searching for ${chalk.cyan(normalizedName)}...`;
+    spinner.update(spinnerText("Searching for", normalizedName));
 
     const pkg = await registry.getPackage(normalizedName);
     if (!pkg) {
-      if (spinner)
-        spinner.fail(`Package ${chalk.red(normalizedName)} not found`);
-      else logger.error(`Package ${normalizedName} not found`);
-      logger.log(chalk.dim("\nTry searching for packages:"));
-      logger.log(
-        chalk.dim(`  cpm search ${packageName.replace(/^@[^/]+\//, "")}`),
+      spinner.fail(failText("Package not found", normalizedName));
+      displayNotFound(packageName);
+      return;
+    }
+
+    // -----------------------------------------------------------------------
+    // Step 5: Download package
+    // -----------------------------------------------------------------------
+    spinner.update(spinnerText("Downloading", `${pkg.name}@${pkg.version}`));
+    const downloadResult = await downloadPackage(pkg);
+
+    if (!downloadResult.success) {
+      spinner.fail(
+        failText("Failed to download", pkg.name, downloadResult.error),
       );
       return;
     }
 
-    if (spinner)
-      spinner.text = `Downloading ${chalk.cyan(pkg.name)}@${pkg.version}...`;
-    const downloadResult = await downloadPackage(pkg);
-
-    if (!downloadResult.success) {
-      if (spinner)
-        spinner.fail(`Failed to download ${pkg.name}: ${downloadResult.error}`);
-      else
-        logger.error(`Failed to download ${pkg.name}: ${downloadResult.error}`);
-      return;
-    }
-
-    // TypeScript narrows the type after success check above
+    // TypeScript narrows type after success check
     const manifest = downloadResult.manifest;
     tempDir = downloadResult.tempDir;
 
-    const targetPlatforms = resolveTargetPlatforms(options);
-    if (!targetPlatforms) {
-      if (spinner) spinner.fail(`Invalid platform: ${options.platform}`);
-      else logger.error(`Invalid platform: ${options.platform}`);
-      logger.log(chalk.dim(`Valid platforms: ${VALID_PLATFORMS.join(", ")}`));
-      return;
-    }
+    // -----------------------------------------------------------------------
+    // Step 6: Install to platforms
+    // -----------------------------------------------------------------------
+    const targetPlatforms = [options.platform] as const;
+    spinner.update(`Installing to ${targetPlatforms.join(", ")}...`);
 
-    if (spinner)
-      spinner.text = `Installing to ${targetPlatforms.join(", ")}...`;
     await ensureClaudeDirs();
-
     const results = await installToPlatforms(
       manifest,
       tempDir,
       targetPlatforms,
     );
 
-    const successful = results.filter((r) => r.success);
-    const failed = results.filter((r) => !r.success);
+    // -----------------------------------------------------------------------
+    // Step 7: Display results
+    // -----------------------------------------------------------------------
+    const [successful, failed] = partitionResults(results);
 
     if (successful.length > 0) {
-      if (spinner) {
-        spinner.succeed(
-          `Installed ${chalk.green(manifest.name)}@${chalk.dim(manifest.version)}`,
-        );
-      } else {
-        logger.success(`Installed ${manifest.name}@${manifest.version}`);
-      }
-      displaySuccessMessage(manifest, successful);
+      spinner.succeed(
+        successText("Installed", manifest.name, manifest.version),
+      );
+      displaySuccess(manifest, successful);
+    } else {
+      spinner.fail(failText("Failed to install", manifest.name));
     }
 
     displayWarnings(failed);
   } catch (error) {
-    if (spinner) spinner.fail(`Failed to install ${packageName}`);
-    else logger.error(`Failed to install ${packageName}`);
+    // Handle unexpected errors
+    spinner.fail(failText("Failed to install", packageName));
     if (error instanceof Error) {
       logger.error(error.message);
     }
   } finally {
+    // Always clean up temporary files
     if (tempDir) {
       await cleanupTempDir(tempDir);
     }

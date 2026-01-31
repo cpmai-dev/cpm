@@ -1,126 +1,150 @@
 /**
- * Search command for CPM
- * Searches the package registry
+ * Search Command
+ *
+ * This module provides the search command for CPM. It follows clean
+ * architecture principles:
+ *
+ * - **Single Responsibility**: Display logic delegated to UI layer
+ * - **Open/Closed**: New package types don't require code changes
+ * - **Type Safety**: All options validated through type guards
+ *
+ * Features:
+ * - Full-text search across package names, descriptions, and keywords
+ * - Filter by package type (rules, skill, mcp, etc.)
+ * - Sort results by downloads, stars, recency, or name
+ * - Limit the number of results
+ *
+ * @example
+ * ```bash
+ * cpm search typescript
+ * cpm search react --type rules
+ * cpm search nextjs --sort stars --limit 5
+ * ```
  */
-import chalk from "chalk";
-import ora from "ora";
-import { resolvePackageType, isPackageType, isSearchSort } from "../types.js";
-import {
-  registry,
-  type SearchOptions as RegistrySearchOptions,
-} from "../utils/registry.js";
+
+import { registry } from "../utils/registry.js";
 import { logger } from "../utils/logger.js";
 
-interface SearchOptions {
-  type?: string;
-  limit?: string;
-  sort?: string;
+// Import UI layer
+import {
+  createSpinner,
+  formatPackageEntry,
+  formatSeparator,
+  SEMANTIC_COLORS,
+} from "./ui/index.js";
+
+// Import command types
+import { type RawSearchOptions, parseSearchOptions } from "./types.js";
+
+// ============================================================================
+// Display Functions
+// ============================================================================
+
+/**
+ * Display search results.
+ *
+ * Renders each package using the UI layer's formatPackageEntry.
+ *
+ * @param packages - Array of packages to display
+ * @param total - Total number of matching packages
+ */
+function displayResults(
+  packages: import("../types.js").RegistryPackage[],
+  total: number,
+): void {
+  // Show result count
+  logger.log(SEMANTIC_COLORS.dim(`\nFound ${total} package(s)\n`));
+
+  // Display each package
+  for (const pkg of packages) {
+    const lines = formatPackageEntry(pkg);
+    lines.forEach((line) => logger.log(line));
+    logger.newline();
+  }
+
+  // Footer with install instructions
+  logger.log(formatSeparator());
+  logger.log(
+    SEMANTIC_COLORS.dim(
+      `Install with: ${SEMANTIC_COLORS.highlight("cpm install <package-name>")}`,
+    ),
+  );
 }
 
-const typeColors: Record<string, (str: string) => string> = {
-  rules: chalk.yellow,
-  skill: chalk.blue,
-  mcp: chalk.magenta,
-  agent: chalk.green,
-  hook: chalk.cyan,
-  workflow: chalk.red,
-  template: chalk.white,
-  bundle: chalk.gray,
-};
+/**
+ * Display message when no results are found.
+ *
+ * @param query - The search query that had no results
+ */
+function displayNoResults(query: string): void {
+  logger.warn(`No packages found for "${query}"`);
+  logger.log(
+    SEMANTIC_COLORS.dim("\nAvailable package types: rules, skill, mcp"),
+  );
+  logger.log(SEMANTIC_COLORS.dim("Try: cpm search react --type rules"));
+}
 
-const typeEmoji: Record<string, string> = {
-  rules: "📜",
-  skill: "⚡",
-  mcp: "🔌",
-  agent: "🤖",
-  hook: "🪝",
-  workflow: "📋",
-  template: "📁",
-  bundle: "📦",
-};
+// ============================================================================
+// Main Command Handler
+// ============================================================================
 
+/**
+ * Main search command entry point.
+ *
+ * This function orchestrates the search workflow:
+ * 1. Parse and validate search options
+ * 2. Query the registry
+ * 3. Display results or helpful message
+ *
+ * @param query - The search query string
+ * @param rawOptions - Raw CLI options (strings from parser)
+ *
+ * @example
+ * ```typescript
+ * await searchCommand("typescript", {});
+ * await searchCommand("react", { type: "rules", limit: "5" });
+ * ```
+ */
 export async function searchCommand(
   query: string,
-  options: SearchOptions,
+  rawOptions: RawSearchOptions,
 ): Promise<void> {
-  const spinner = logger.isQuiet()
-    ? null
-    : ora(`Searching for "${query}"...`).start();
-  const parsedLimit = parseInt(options.limit || "10", 10);
-  const limit = Number.isNaN(parsedLimit)
-    ? 10
-    : Math.max(1, Math.min(parsedLimit, 100));
+  // -------------------------------------------------------------------------
+  // Step 1: Parse and validate options
+  // -------------------------------------------------------------------------
+  const options = parseSearchOptions(query, rawOptions);
+
+  // -------------------------------------------------------------------------
+  // Step 2: Create progress spinner
+  // -------------------------------------------------------------------------
+  const spinner = createSpinner(`Searching for "${query}"...`);
 
   try {
-    const searchOptions: RegistrySearchOptions = {
-      query,
-      limit,
-    };
+    // -----------------------------------------------------------------------
+    // Step 3: Execute search
+    // -----------------------------------------------------------------------
+    const results = await registry.search({
+      query: options.query,
+      limit: options.limit,
+      type: options.type,
+      sort: options.sort,
+    });
 
-    // Type-safe validation before assignment
-    if (options.type && isPackageType(options.type)) {
-      searchOptions.type = options.type;
-    }
+    // Stop spinner before showing results
+    spinner.stop();
 
-    if (options.sort && isSearchSort(options.sort)) {
-      searchOptions.sort = options.sort;
-    }
-
-    const results = await registry.search(searchOptions);
-
-    if (spinner) spinner.stop();
-
+    // -----------------------------------------------------------------------
+    // Step 4: Display results
+    // -----------------------------------------------------------------------
     if (results.packages.length === 0) {
-      logger.warn(`No packages found for "${query}"`);
-      logger.log(chalk.dim("\nAvailable package types: rules, skill, mcp"));
-      logger.log(chalk.dim("Try: cpm search react --type rules"));
+      displayNoResults(query);
       return;
     }
 
-    logger.log(chalk.dim(`\nFound ${results.total} package(s)\n`));
-
-    for (const pkg of results.packages) {
-      const pkgType = resolvePackageType(pkg);
-      const typeColor = typeColors[pkgType] || chalk.white;
-      const emoji = typeEmoji[pkgType] || "📦";
-
-      const badges: string[] = [];
-      if (pkg.verified) {
-        badges.push(chalk.green("✓ verified"));
-      }
-
-      logger.log(
-        `${emoji} ${chalk.bold.white(pkg.name)} ${chalk.dim(`v${pkg.version}`)}` +
-          (badges.length > 0 ? ` ${badges.join(" ")}` : ""),
-      );
-
-      logger.log(`   ${chalk.dim(pkg.description)}`);
-
-      const meta = [
-        typeColor(pkgType),
-        chalk.dim(`↓ ${formatNumber(pkg.downloads ?? 0)}`),
-        pkg.stars !== undefined ? chalk.dim(`★ ${pkg.stars}`) : null,
-        chalk.dim(`@${pkg.author}`),
-      ].filter(Boolean) as string[];
-      logger.log(`   ${meta.join(chalk.dim(" · "))}`);
-
-      logger.newline();
-    }
-
-    logger.log(chalk.dim("─".repeat(50)));
-    logger.log(
-      chalk.dim(`Install with: ${chalk.cyan("cpm install <package-name>")}`),
-    );
+    displayResults(results.packages, results.total);
   } catch (error) {
-    if (spinner) spinner.fail("Search failed");
-    else logger.error("Search failed");
+    // Handle search errors
+    spinner.fail("Search failed");
     logger.error(error instanceof Error ? error.message : "Unknown error");
   }
-}
-
-function formatNumber(num: number): string {
-  if (num >= 1000) {
-    return `${(num / 1000).toFixed(1)}k`;
-  }
-  return num.toString();
 }
