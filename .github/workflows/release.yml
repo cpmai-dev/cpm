@@ -11,6 +11,9 @@ jobs:
   release:
     name: Publish to npm
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -45,9 +48,7 @@ jobs:
         if: steps.check.outputs.exists == 'false'
         run: |
           cd apps/cli
-          npm publish --tag beta --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          npm publish --tag beta --access public --provenance
 
       - name: Skip publish
         if: steps.check.outputs.exists == 'true'

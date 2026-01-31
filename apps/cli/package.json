@@ -1,6 +1,6 @@
 {
   "name": "@cpmai/cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "The package manager for Claude Code - cpm-ai.dev",
   "keywords": [
     "claude-code",
@@ -29,7 +29,7 @@
   ],
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsup src/index.ts --format esm --dts --clean",
+    "build": "tsup",
     "start": "node dist/index.js",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
@@ -39,8 +39,6 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@cpm/registry-client": "workspace:*",
-    "@cpm/types": "workspace:*",
     "chalk": "^5.4.1",
     "commander": "^12.1.0",
     "consola": "^3.4.2",

@@ -1,11 +1,11 @@
-# @cpm/cli
+# @cpmai/cli
 
 The command-line interface for CPM (Claude Package Manager).
 
 ## Installation
 
 ```bash
-npm install -g @cpm/cli
+npm install -g @cpmai/cli
 ```
 
 ## Commands
@@ -15,12 +15,13 @@ npm install -g @cpm/cli
 Install a package from the registry.
 
 ```bash
-cpm install commit                    # Installs @cpm/commit
-cpm install @cpm/nextjs-rules         # Full package name
+cpm install commit                    # Installs @cpmai/commit
+cpm install @cpmai/nextjs-rules       # Full package name
 cpm install @affaan-m/claude-rules    # Package from another author
 ```
 
 **Options:**
+
 - `-p, --platform <platform>` - Target platform (default: `claude-code`)
 
 ### `cpm uninstall <package>`
@@ -29,7 +30,7 @@ Remove an installed package.
 
 ```bash
 cpm uninstall commit
-cpm rm @cpm/nextjs-rules    # Alias: rm
+cpm rm @cpmai/nextjs-rules    # Alias: rm
 ```
 
 ### `cpm search <query>`
@@ -43,6 +44,7 @@ cpm search typescript --limit 5
 ```
 
 **Options:**
+
 - `-t, --type <type>` - Filter by type (`rules`, `skill`, `mcp`)
 - `-l, --limit <number>` - Limit results (default: 10)
 
@@ -75,11 +77,11 @@ cpm --help          # Show help
 
 ## Package Types
 
-| Type | Description | Installed To |
-|------|-------------|--------------|
-| `rules` | Coding guidelines | `~/.claude/rules/<name>/` |
-| `skill` | Slash commands | `~/.claude/skills/<name>/` |
-| `mcp` | MCP servers | `~/.claude.json` |
+| Type    | Description       | Installed To               |
+| ------- | ----------------- | -------------------------- |
+| `rules` | Coding guidelines | `~/.claude/rules/<name>/`  |
+| `skill` | Slash commands    | `~/.claude/skills/<name>/` |
+| `mcp`   | MCP servers       | `~/.claude.json`           |
 
 ## Development
 
@@ -132,9 +134,11 @@ The CLI implements several security measures:
 ### MCP Command Validation
 
 Only these commands are allowed for MCP servers:
+
 - `npx`, `node`, `python`, `python3`, `deno`, `bun`, `uvx`
 
 Blocked argument patterns:
+
 - `--eval`, `-e`, `-c` (code execution)
 - `curl`, `wget` (network commands)
 - `rm`, `sudo`, `chmod`, `chown` (system commands)
