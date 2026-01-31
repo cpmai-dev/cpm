@@ -9,8 +9,8 @@ import type { PackageManifest } from '../types.js';
  * Used when network fetch fails or for offline installation
  */
 export const EMBEDDED_PACKAGES: Record<string, PackageManifest> = {
-  '@official/nextjs-rules': {
-    name: '@official/nextjs-rules',
+  '@cpm/nextjs-rules': {
+    name: '@cpm/nextjs-rules',
     version: '1.0.0',
     description: 'Next.js 14+ App Router conventions and best practices for Claude Code',
     type: 'rules',
@@ -72,8 +72,8 @@ function Counter() {
     },
   },
 
-  '@official/typescript-strict': {
-    name: '@official/typescript-strict',
+  '@cpm/typescript-strict': {
+    name: '@cpm/typescript-strict',
     version: '1.0.0',
     description: 'TypeScript strict mode best practices and conventions',
     type: 'rules',
@@ -134,8 +134,8 @@ function processItems(items: readonly Item[]): void {
     },
   },
 
-  '@official/code-review': {
-    name: '@official/code-review',
+  '@cpm/code-review': {
+    name: '@cpm/code-review',
     version: '1.0.0',
     description: 'Automated code review skill for Claude Code',
     type: 'skill',
@@ -203,8 +203,8 @@ You are an expert code reviewer. When the user invokes /review, analyze the prov
     },
   },
 
-  '@official/git-commit': {
-    name: '@official/git-commit',
+  '@cpm/git-commit': {
+    name: '@cpm/git-commit',
     version: '1.0.0',
     description: 'Smart commit message generation skill',
     type: 'skill',
@@ -262,8 +262,8 @@ Closes #123
     },
   },
 
-  '@official/react-patterns': {
-    name: '@official/react-patterns',
+  '@cpm/react-patterns': {
+    name: '@cpm/react-patterns',
     version: '1.0.0',
     description: 'React component patterns and best practices',
     type: 'rules',
@@ -315,8 +315,8 @@ Tabs.Panel = function Panel({ children }) { /* ... */ };
     },
   },
 
-  '@official/refactor': {
-    name: '@official/refactor',
+  '@cpm/refactor': {
+    name: '@cpm/refactor',
     version: '1.0.0',
     description: 'Code refactoring assistant skill',
     type: 'skill',
@@ -358,8 +358,8 @@ You are an expert at improving code quality through refactoring.
     },
   },
 
-  '@official/explain': {
-    name: '@official/explain',
+  '@cpm/explain': {
+    name: '@cpm/explain',
     version: '1.0.0',
     description: 'Code explanation and documentation skill',
     type: 'skill',
@@ -391,8 +391,8 @@ You are an expert at explaining code clearly and thoroughly.
     },
   },
 
-  '@official/api-design': {
-    name: '@official/api-design',
+  '@cpm/api-design': {
+    name: '@cpm/api-design',
     version: '1.0.0',
     description: 'REST and GraphQL API design conventions',
     type: 'rules',
@@ -430,8 +430,8 @@ You are an expert API designer following industry best practices.
     },
   },
 
-  '@official/testing-patterns': {
-    name: '@official/testing-patterns',
+  '@cpm/testing-patterns': {
+    name: '@cpm/testing-patterns',
     version: '1.0.0',
     description: 'Testing best practices for JavaScript/TypeScript projects',
     type: 'rules',
@@ -479,8 +479,8 @@ describe('UserService', () => {
     },
   },
 
-  '@official/github-mcp': {
-    name: '@official/github-mcp',
+  '@cpm/github-mcp': {
+    name: '@cpm/github-mcp',
     version: '1.0.0',
     description: 'GitHub API integration MCP server for Claude Code',
     type: 'mcp',

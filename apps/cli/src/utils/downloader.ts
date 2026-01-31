@@ -9,6 +9,7 @@ import os from 'os';
 import * as tar from 'tar';
 import yaml from 'yaml';
 import type { RegistryPackage, PackageManifest, PackageType } from '../types.js';
+import { resolvePackageType } from '../types.js';
 import { getEmbeddedManifest } from './embedded-packages.js';
 import { logger } from './logger.js';
 
@@ -261,7 +262,8 @@ async function fetchPackageFromPath(
     }>;
 
     let mainContent = '';
-    const contentFile = getContentFileName(pkg.type);
+    const pkgType = resolvePackageType(pkg);
+    const contentFile = getContentFileName(pkgType);
 
     for (const file of files) {
       if (file.type === 'file' && file.download_url) {
@@ -296,7 +298,8 @@ async function fetchSingleFileFromPath(pkg: RegistryPackage): Promise<PackageMan
 
   try {
     const safePath = validatePackagePath(pkg.path);
-    const contentFile = getContentFileName(pkg.type);
+    const pkgType = resolvePackageType(pkg);
+    const contentFile = getContentFileName(pkgType);
     const contentUrl = `${PACKAGES_BASE_URL}/${safePath}/${contentFile}`;
 
     const response = await got(contentUrl, {
@@ -343,18 +346,19 @@ function parseGitHubInfo(baseUrl: string): { owner: string; repo: string } | nul
  * Create manifest from registry data with content
  */
 function createManifestWithContent(pkg: RegistryPackage, content: string): PackageManifest {
+  const pkgType = resolvePackageType(pkg);
   return {
     name: pkg.name,
     version: pkg.version,
     description: pkg.description,
-    type: pkg.type,
+    type: pkgType,
     author: { name: pkg.author },
     keywords: pkg.keywords,
     universal: {
       rules: content,
       prompt: content,
     },
-    skill: pkg.type === 'skill' ? {
+    skill: pkgType === 'skill' ? {
       command: `/${pkg.name.split('/').pop()}`,
       description: pkg.description,
     } : undefined,
@@ -369,7 +373,7 @@ function createManifestFromRegistry(pkg: RegistryPackage): PackageManifest {
     name: pkg.name,
     version: pkg.version,
     description: pkg.description,
-    type: pkg.type,
+    type: resolvePackageType(pkg),
     author: { name: pkg.author },
     repository: pkg.repository,
     keywords: pkg.keywords,

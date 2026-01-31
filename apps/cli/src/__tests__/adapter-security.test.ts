@@ -112,7 +112,12 @@ function sanitizeFolderName(name: string): string {
     throw new Error('Invalid package name: contains null bytes');
   }
 
-  let sanitized = decoded.replace(/^@/, '').replace(/\//g, '--');
+  // Extract just the package name (after the /)
+  // @cpm/nextjs-rules → nextjs-rules
+  let sanitized = decoded.includes('/')
+    ? decoded.split('/').pop() || decoded
+    : decoded.replace(/^@/, '');
+
   sanitized = sanitized.replace(/\.\./g, '');
   sanitized = sanitized.replace(/%2e%2e/gi, '');
   sanitized = sanitized.replace(/%2f/gi, '');
@@ -339,9 +344,9 @@ describe('sanitizeFileName', () => {
 
 describe('sanitizeFolderName', () => {
   describe('valid folder names', () => {
-    it('should convert scoped packages to flat names', () => {
-      expect(sanitizeFolderName('@official/nextjs-rules')).toBe('official--nextjs-rules');
-      expect(sanitizeFolderName('@community/my-skill')).toBe('community--my-skill');
+    it('should extract package name from scoped packages', () => {
+      expect(sanitizeFolderName('@cpm/nextjs-rules')).toBe('nextjs-rules');
+      expect(sanitizeFolderName('@affaan-m/my-skill')).toBe('my-skill');
     });
 
     it('should handle non-scoped packages', () => {

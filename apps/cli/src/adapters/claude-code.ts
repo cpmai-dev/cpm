@@ -109,7 +109,8 @@ function sanitizeFileName(fileName: string): { safe: boolean; sanitized: string;
 
 /**
  * Sanitize package name for use as folder name
- * Converts @scope/name to scope--name (flat structure)
+ * Extracts just the package name (after the /) for cleaner folders
+ * @author/package-name → package-name
  * Prevents path traversal attacks
  */
 function sanitizeFolderName(name: string): string {
@@ -130,8 +131,12 @@ function sanitizeFolderName(name: string): string {
     throw new Error('Invalid package name: contains null bytes');
   }
 
-  // Remove @ prefix and replace forward slashes with double dash
-  let sanitized = decoded.replace(/^@/, '').replace(/\//g, '--');
+  // Extract just the package name (after the /)
+  // @cpm/nextjs-rules → nextjs-rules
+  // @affaan-m/backend-patterns → backend-patterns
+  let sanitized = decoded.includes('/')
+    ? decoded.split('/').pop() || decoded
+    : decoded.replace(/^@/, '');
 
   // Remove any path traversal attempts (including encoded)
   sanitized = sanitized.replace(/\.\./g, '');
@@ -236,15 +241,15 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
     const folderName = sanitizeFolderName(packageName);
 
     try {
-      // Remove rules file (from global ~/.claude/rules)
-      const rulesDir = getRulesPath('claude-code');
-      const rulesPath = path.join(rulesDir, `${folderName}.md`);
+      // Remove rules directory (from global ~/.claude/rules/<package>/)
+      const rulesBaseDir = getRulesPath('claude-code');
+      const rulesPath = path.join(rulesBaseDir, folderName);
       if (await fs.pathExists(rulesPath)) {
         await fs.remove(rulesPath);
         filesWritten.push(rulesPath);
       }
 
-      // Remove skill directory (from global ~/.claude/skills)
+      // Remove skill directory (from global ~/.claude/skills/<package>/)
       const skillsDir = getSkillsPath();
       const skillPath = path.join(skillsDir, folderName);
       if (await fs.pathExists(skillPath)) {
@@ -308,8 +313,10 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
   private async installRules(manifest: PackageManifest, _projectPath: string, packagePath?: string): Promise<string[]> {
     const filesWritten: string[] = [];
 
-    // Install to global ~/.claude/rules
-    const rulesDir = getRulesPath('claude-code');
+    // Install to global ~/.claude/rules/<package-name>/
+    const rulesBaseDir = getRulesPath('claude-code');
+    const folderName = sanitizeFolderName(manifest.name);
+    const rulesDir = path.join(rulesBaseDir, folderName);
     await fs.ensureDir(rulesDir);
 
     // If packagePath exists and has files, copy all .md files
@@ -346,11 +353,9 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
     const rulesContent = manifest.universal?.rules || manifest.universal?.prompt;
     if (!rulesContent) return filesWritten;
 
-    const fileName = sanitizeFolderName(manifest.name);
-    const rulesPath = path.join(rulesDir, `${fileName}.md`);
+    const rulesPath = path.join(rulesDir, 'RULES.md');
     const content = `# ${manifest.name}\n\n${manifest.description}\n\n${rulesContent.trim()}\n`;
 
-    await fs.ensureDir(path.dirname(rulesPath));
     await fs.writeFile(rulesPath, content, 'utf-8');
     filesWritten.push(rulesPath);
 
@@ -359,8 +364,6 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
 
   private async installSkill(manifest: PackageManifest, _projectPath: string, packagePath?: string): Promise<string[]> {
     const filesWritten: string[] = [];
-
-    if (!manifest.skill) return filesWritten;
 
     // Install to global ~/.claude/skills with sanitized folder name
     const skillsDir = getSkillsPath();
@@ -398,11 +401,20 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
       }
     }
 
-    // Fallback: create SKILL.md from manifest content
-    const skillContent = this.formatSkillMd(manifest);
-    const skillPath = path.join(skillDir, 'SKILL.md');
-    await fs.writeFile(skillPath, skillContent, 'utf-8');
-    filesWritten.push(skillPath);
+    // Fallback: create SKILL.md from manifest content (only if skill config exists)
+    if (manifest.skill) {
+      const skillContent = this.formatSkillMd(manifest);
+      const skillPath = path.join(skillDir, 'SKILL.md');
+      await fs.writeFile(skillPath, skillContent, 'utf-8');
+      filesWritten.push(skillPath);
+    } else if (manifest.universal?.prompt || manifest.universal?.rules) {
+      // Create basic skill from universal content
+      const content = manifest.universal.prompt || manifest.universal.rules || '';
+      const skillPath = path.join(skillDir, 'SKILL.md');
+      const skillContent = `# ${manifest.name}\n\n${manifest.description}\n\n${content.trim()}\n`;
+      await fs.writeFile(skillPath, skillContent, 'utf-8');
+      filesWritten.push(skillPath);
+    }
 
     return filesWritten;
   }

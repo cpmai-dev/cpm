@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import type { PackageType } from '../types.js';
+import { resolvePackageType } from '../types.js';
 import { registry, type SearchOptions as RegistrySearchOptions } from '../utils/registry.js';
 import { logger } from '../utils/logger.js';
 
@@ -70,14 +71,13 @@ export async function searchCommand(
 
     // Display results
     for (const pkg of results.packages) {
-      const typeColor = typeColors[pkg.type] || chalk.white;
-      const emoji = typeEmoji[pkg.type] || '📦';
+      const pkgType = resolvePackageType(pkg);
+      const typeColor = typeColors[pkgType] || chalk.white;
+      const emoji = typeEmoji[pkgType] || '📦';
 
       // Build badges
       const badges: string[] = [];
-      if (pkg.official) {
-        badges.push(chalk.hex('#f97316')('★ official'));
-      } else if (pkg.verified) {
+      if (pkg.verified) {
         badges.push(chalk.green('✓ verified'));
       }
 
@@ -92,7 +92,7 @@ export async function searchCommand(
 
       // Metadata line (handle optional stars)
       const meta = [
-        typeColor(pkg.type),
+        typeColor(pkgType),
         chalk.dim(`↓ ${formatNumber(pkg.downloads)}`),
         pkg.stars !== undefined ? chalk.dim(`★ ${pkg.stars}`) : null,
         chalk.dim(`@${pkg.author}`),

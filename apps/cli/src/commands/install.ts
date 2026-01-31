@@ -89,13 +89,13 @@ function isValidPlatform(platform: string): platform is Platform {
 }
 
 /**
- * Normalize package name - add @official/ scope if not present
+ * Normalize package name - add @cpm/ scope if not present
  */
 function normalizePackageName(name: string): string {
   if (name.startsWith('@')) {
     return name;
   }
-  return `@official/${name}`;
+  return `@cpm/${name}`;
 }
 
 // ============================================================================
@@ -241,7 +241,7 @@ export async function installCommand(
       if (spinner) spinner.fail(`Package ${chalk.red(normalizedName)} not found`);
       else logger.error(`Package ${normalizedName} not found`);
       logger.log(chalk.dim('\nTry searching for packages:'));
-      logger.log(chalk.dim(`  cpm search ${packageName.replace('@official/', '')}`));
+      logger.log(chalk.dim(`  cpm search ${packageName.replace(/^@[^/]+\//, '')}`));
       return;
     }
 

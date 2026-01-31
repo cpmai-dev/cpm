@@ -60,7 +60,7 @@ describe('validatePackageName', () => {
     });
 
     it('should accept scoped package names', () => {
-      expect(validatePackageName('@official/nextjs-rules')).toEqual({ valid: true });
+      expect(validatePackageName('@cpm/nextjs-rules')).toEqual({ valid: true });
       expect(validatePackageName('@community/my-skill')).toEqual({ valid: true });
       expect(validatePackageName('@user123/package_name')).toEqual({ valid: true });
     });

@@ -26,16 +26,18 @@ async function scanInstalledPackages(): Promise<InstalledItem[]> {
   const items: InstalledItem[] = [];
   const claudeHome = path.join(os.homedir(), '.claude');
 
-  // Scan rules directory
+  // Scan rules directory (each package is a subdirectory)
   const rulesDir = path.join(claudeHome, 'rules');
   if (await fs.pathExists(rulesDir)) {
-    const files = await fs.readdir(rulesDir);
-    for (const file of files) {
-      if (file.endsWith('.md')) {
+    const entries = await fs.readdir(rulesDir);
+    for (const entry of entries) {
+      const entryPath = path.join(rulesDir, entry);
+      const stat = await fs.stat(entryPath);
+      if (stat.isDirectory()) {
         items.push({
-          name: file.replace('.md', ''),
+          name: entry,
           type: 'rules',
-          path: path.join(rulesDir, file),
+          path: entryPath,
         });
       }
     }

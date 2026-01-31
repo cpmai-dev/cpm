@@ -15,9 +15,9 @@ npm install -g @cpm/cli
 Install a package from the registry.
 
 ```bash
-cpm install commit                    # Installs @official/commit
-cpm install @official/nextjs-rules    # Full package name
-cpm install @community/my-package     # Community package
+cpm install commit                    # Installs @cpm/commit
+cpm install @cpm/nextjs-rules         # Full package name
+cpm install @affaan-m/claude-rules    # Package from another author
 ```
 
 **Options:**
@@ -29,7 +29,7 @@ Remove an installed package.
 
 ```bash
 cpm uninstall commit
-cpm rm @official/nextjs-rules    # Alias: rm
+cpm rm @cpm/nextjs-rules    # Alias: rm
 ```
 
 ### `cpm search <query>`
@@ -77,7 +77,7 @@ cpm --help          # Show help
 
 | Type | Description | Installed To |
 |------|-------------|--------------|
-| `rules` | Coding guidelines | `~/.claude/rules/<name>.md` |
+| `rules` | Coding guidelines | `~/.claude/rules/<name>/` |
 | `skill` | Slash commands | `~/.claude/skills/<name>/` |
 | `mcp` | MCP servers | `~/.claude.json` |
 

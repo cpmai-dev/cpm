@@ -10,12 +10,10 @@ export async function uninstallCommand(packageName: string): Promise<void> {
   const spinner = logger.isQuiet() ? null : ora(`Uninstalling ${chalk.cyan(packageName)}...`).start();
 
   try {
-    // Normalize package name (remove @official/ prefix for folder lookup)
-    const folderName = packageName
-      .replace('@official/', '')
-      .replace('@community/', '')
-      .replace(/^@/, '')
-      .replace(/\//g, '--');
+    // Extract just the package name (@author/package → package)
+    const folderName = packageName.includes('/')
+      ? packageName.split('/').pop() || packageName
+      : packageName.replace(/^@/, '');
 
     const adapter = getAdapter('claude-code');
     const result = await adapter.uninstall(folderName, process.cwd());

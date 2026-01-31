@@ -7,11 +7,11 @@ import { EMBEDDED_PACKAGES, getEmbeddedManifest } from '../utils/embedded-packag
 
 describe('EMBEDDED_PACKAGES', () => {
   it('should contain official packages', () => {
-    expect(EMBEDDED_PACKAGES).toHaveProperty('@official/nextjs-rules');
-    expect(EMBEDDED_PACKAGES).toHaveProperty('@official/typescript-strict');
-    expect(EMBEDDED_PACKAGES).toHaveProperty('@official/code-review');
-    expect(EMBEDDED_PACKAGES).toHaveProperty('@official/git-commit');
-    expect(EMBEDDED_PACKAGES).toHaveProperty('@official/react-patterns');
+    expect(EMBEDDED_PACKAGES).toHaveProperty('@cpm/nextjs-rules');
+    expect(EMBEDDED_PACKAGES).toHaveProperty('@cpm/typescript-strict');
+    expect(EMBEDDED_PACKAGES).toHaveProperty('@cpm/code-review');
+    expect(EMBEDDED_PACKAGES).toHaveProperty('@cpm/git-commit');
+    expect(EMBEDDED_PACKAGES).toHaveProperty('@cpm/react-patterns');
   });
 
   describe('package structure validation', () => {
@@ -95,18 +95,18 @@ describe('EMBEDDED_PACKAGES', () => {
 
 describe('getEmbeddedManifest', () => {
   it('should return manifest for existing package', () => {
-    const manifest = getEmbeddedManifest('@official/nextjs-rules');
+    const manifest = getEmbeddedManifest('@cpm/nextjs-rules');
     expect(manifest).not.toBeNull();
-    expect(manifest?.name).toBe('@official/nextjs-rules');
+    expect(manifest?.name).toBe('@cpm/nextjs-rules');
   });
 
   it('should return null for non-existent package', () => {
-    const manifest = getEmbeddedManifest('@official/non-existent');
+    const manifest = getEmbeddedManifest('@cpm/non-existent');
     expect(manifest).toBeNull();
   });
 
-  it('should return null for community packages', () => {
-    const manifest = getEmbeddedManifest('@community/some-package');
+  it('should return null for unknown author packages', () => {
+    const manifest = getEmbeddedManifest('@unknown/some-package');
     expect(manifest).toBeNull();
   });
 });

@@ -6,7 +6,7 @@
 
 ```bash
 # Install a package
-cpm install @official/commit
+cpm install @cpm/commit
 
 # Search for packages
 cpm search react
@@ -42,7 +42,7 @@ pnpm add -g @cpm/cli
 cpm install commit
 
 # Install with full package name
-cpm install @official/nextjs-rules
+cpm install @cpm/nextjs-rules
 
 # Install community package
 cpm install @community/some-package
@@ -97,7 +97,7 @@ cpm --help
 
 | Type | Description | Installation Location |
 |------|-------------|----------------------|
-| `rules` | Coding guidelines and standards | `~/.claude/rules/*.md` |
+| `rules` | Coding guidelines and standards | `~/.claude/rules/<name>/` |
 | `skill` | Slash commands for Claude Code | `~/.claude/skills/<name>/` |
 | `mcp` | MCP server integrations | `~/.claude.json` |
 
@@ -123,7 +123,7 @@ CPM follows a simple, stateless design:
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │              Claude Code Adapter                     │   │
 │  │                                                      │   │
-│  │  ~/.claude/rules/     - Rules files (.md)           │   │
+│  │  ~/.claude/rules/     - Rules directories           │   │
 │  │  ~/.claude/skills/    - Skill directories           │   │
 │  │  ~/.claude.json       - MCP server config           │   │
 │  └─────────────────────────────────────────────────────┘   │
