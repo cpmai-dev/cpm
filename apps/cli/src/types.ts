@@ -1,6 +1,14 @@
-export type PackageType = 'rules' | 'mcp' | 'skill' | 'agent' | 'hook' | 'workflow' | 'template' | 'bundle';
+export type PackageType =
+  | "rules"
+  | "mcp"
+  | "skill"
+  | "agent"
+  | "hook"
+  | "workflow"
+  | "template"
+  | "bundle";
 
-export type Platform = 'claude-code';
+export type Platform = "claude-code";
 
 export interface PackageManifest {
   name: string;
@@ -23,17 +31,9 @@ export interface PackageManifest {
     globs?: string[];
   };
 
-  // Platform-specific
-  platforms?: {
-    cursor?: PlatformConfig;
-    'claude-code'?: PlatformConfig;
-    windsurf?: PlatformConfig;
-    continue?: PlatformConfig;
-  };
-
   // MCP server config
   mcp?: {
-    transport?: 'stdio' | 'http';
+    transport?: "stdio" | "http";
     command?: string;
     args?: string[];
     env?: Record<string, string>;
@@ -46,28 +46,13 @@ export interface PackageManifest {
   };
 }
 
-export interface PlatformConfig {
-  rules_path?: string;
-  format?: 'markdown' | 'mdc' | 'yaml';
-  settings?: Record<string, unknown>;
-}
-
-export interface InstalledPackage {
-  name: string;
-  version: string;
-  type: PackageType;
-  platforms: Platform[];
-  installedAt: string;
-  path: string;
-}
-
 export interface RegistryPackage {
   name: string;
   version: string;
   description: string;
-  type?: PackageType;  // Optional - can be derived from path
+  type?: PackageType; // Optional - can be derived from path
   author: string;
-  downloads?: number;  // Optional - defaults to 0
+  downloads?: number; // Optional - defaults to 0
   path?: string;
   stars?: number;
   verified?: boolean;
@@ -83,14 +68,14 @@ export interface RegistryPackage {
  * Path format: {type}/{author}/{package}
  */
 export function getTypeFromPath(path: string): PackageType | null {
-  if (path.startsWith('skills/')) return 'skill';
-  if (path.startsWith('rules/')) return 'rules';
-  if (path.startsWith('mcp/')) return 'mcp';
-  if (path.startsWith('agents/')) return 'agent';
-  if (path.startsWith('hooks/')) return 'hook';
-  if (path.startsWith('workflows/')) return 'workflow';
-  if (path.startsWith('templates/')) return 'template';
-  if (path.startsWith('bundles/')) return 'bundle';
+  if (path.startsWith("skills/")) return "skill";
+  if (path.startsWith("rules/")) return "rules";
+  if (path.startsWith("mcp/")) return "mcp";
+  if (path.startsWith("agents/")) return "agent";
+  if (path.startsWith("hooks/")) return "hook";
+  if (path.startsWith("workflows/")) return "workflow";
+  if (path.startsWith("templates/")) return "template";
+  if (path.startsWith("bundles/")) return "bundle";
   return null;
 }
 
@@ -104,11 +89,6 @@ export function resolvePackageType(pkg: RegistryPackage): PackageType {
     if (derived) return derived;
   }
   throw new Error(`Cannot determine type for package: ${pkg.name}`);
-}
-
-export interface SearchResult {
-  packages: RegistryPackage[];
-  total: number;
 }
 
 /**

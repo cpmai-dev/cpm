@@ -4,11 +4,11 @@ import type {
   SearchOptions,
   SearchResult,
   PackageType,
-} from '@cpm/types';
-import { getFallbackPackages } from './fallback-packages.js';
+} from "@cpm/types";
 
 // Registry configuration
-const DEFAULT_REGISTRY_URL = 'https://raw.githubusercontent.com/cpm-ai/registry/main/index.json';
+const DEFAULT_REGISTRY_URL =
+  "https://raw.githubusercontent.com/cpm-ai/registry/main/index.json";
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export interface RegistryConfig {
@@ -33,7 +33,11 @@ export class Registry {
    */
   async load(forceRefresh: boolean = false): Promise<RegistryData> {
     // Check memory cache first
-    if (!forceRefresh && this.cache && Date.now() - this.cacheTimestamp < CACHE_TTL) {
+    if (
+      !forceRefresh &&
+      this.cache &&
+      Date.now() - this.cacheTimestamp < CACHE_TTL
+    ) {
       return this.cache;
     }
 
@@ -41,8 +45,8 @@ export class Registry {
     try {
       const response = await fetch(this.registryUrl, {
         headers: {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache',
+          Accept: "application/json",
+          "Cache-Control": "no-cache",
         },
       });
 
@@ -50,21 +54,23 @@ export class Registry {
         throw new Error(`Registry fetch failed: ${response.status}`);
       }
 
-      const data = await response.json() as RegistryData;
+      const data = (await response.json()) as RegistryData;
 
       // Update cache
       this.cache = data;
       this.cacheTimestamp = Date.now();
 
       return data;
-    } catch (error) {
+    } catch {
       // If fetch fails and we have stale cache, use it
       if (this.cache) {
         return this.cache;
       }
 
-      // Return fallback packages
-      return this.getFallbackRegistry();
+      // No cache available, throw error
+      throw new Error(
+        "Unable to fetch package registry. Please check your internet connection and try again.",
+      );
     }
   }
 
@@ -78,29 +84,33 @@ export class Registry {
     // Filter by query
     if (options.query) {
       const query = options.query.toLowerCase();
-      packages = packages.filter(pkg =>
-        pkg.name.toLowerCase().includes(query) ||
-        pkg.description.toLowerCase().includes(query) ||
-        (pkg.keywords?.some(k => k.toLowerCase().includes(query)))
+      packages = packages.filter(
+        (pkg) =>
+          pkg.name.toLowerCase().includes(query) ||
+          pkg.description.toLowerCase().includes(query) ||
+          pkg.keywords?.some((k) => k.toLowerCase().includes(query)),
       );
     }
 
     // Filter by type
     if (options.type) {
-      packages = packages.filter(pkg => pkg.type === options.type);
+      packages = packages.filter((pkg) => pkg.type === options.type);
     }
 
     // Sort
-    const sort = options.sort || 'downloads';
+    const sort = options.sort || "downloads";
     packages.sort((a, b) => {
       switch (sort) {
-        case 'downloads':
+        case "downloads":
           return b.downloads - a.downloads;
-        case 'stars':
+        case "stars":
           return b.stars - a.stars;
-        case 'recent':
-          return new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime();
-        case 'name':
+        case "recent":
+          return (
+            new Date(b.publishedAt || 0).getTime() -
+            new Date(a.publishedAt || 0).getTime()
+          );
+        case "name":
           return a.name.localeCompare(b.name);
         default:
           return 0;
@@ -122,7 +132,7 @@ export class Registry {
    */
   async getPackage(name: string): Promise<RegistryPackage | null> {
     const data = await this.load();
-    return data.packages.find(pkg => pkg.name === name) || null;
+    return data.packages.find((pkg) => pkg.name === name) || null;
   }
 
   /**
@@ -130,7 +140,7 @@ export class Registry {
    */
   async getPackagesByType(type: PackageType): Promise<RegistryPackage[]> {
     const data = await this.load();
-    return data.packages.filter(pkg => pkg.type === type);
+    return data.packages.filter((pkg) => pkg.type === type);
   }
 
   /**
@@ -139,20 +149,9 @@ export class Registry {
   async getFeaturedPackages(limit: number = 10): Promise<RegistryPackage[]> {
     const data = await this.load();
     return data.packages
-      .filter(pkg => pkg.official || pkg.verified)
+      .filter((pkg) => pkg.official || pkg.verified)
       .sort((a, b) => b.downloads - a.downloads)
       .slice(0, limit);
-  }
-
-  /**
-   * Fallback registry data when network is unavailable
-   */
-  private getFallbackRegistry(): RegistryData {
-    return {
-      version: 1,
-      generated: new Date().toISOString(),
-      packages: getFallbackPackages(),
-    };
   }
 }
 

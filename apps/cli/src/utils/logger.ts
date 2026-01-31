@@ -2,7 +2,7 @@
  * Production-grade logger for CPM CLI
  * Provides log levels, quiet mode, and consistent formatting
  */
-import { createConsola, type LogLevel } from 'consola';
+import { createConsola, type LogLevel } from "consola";
 
 export interface LoggerOptions {
   verbose?: boolean;
@@ -16,7 +16,7 @@ export interface LoggerOptions {
  * verbose: all including debug
  */
 function getLogLevel(options: LoggerOptions): LogLevel {
-  if (options.quiet) return 0;  // Only fatal/error
+  if (options.quiet) return 0; // Only fatal/error
   if (options.verbose) return 4; // Debug and above
   return 3; // Info and above (default)
 }
@@ -35,20 +35,6 @@ function createLogger(options: LoggerOptions = {}) {
   });
 
   return {
-    /**
-     * Debug message (only shown in verbose mode)
-     */
-    debug: (message: string, ...args: unknown[]) => {
-      consola.debug(message, ...args);
-    },
-
-    /**
-     * Informational message
-     */
-    info: (message: string, ...args: unknown[]) => {
-      consola.info(message, ...args);
-    },
-
     /**
      * Success message
      */
@@ -93,11 +79,6 @@ function createLogger(options: LoggerOptions = {}) {
      * Check if in quiet mode
      */
     isQuiet: () => options.quiet ?? false,
-
-    /**
-     * Check if in verbose mode
-     */
-    isVerbose: () => options.verbose ?? false,
   };
 }
 
@@ -113,22 +94,15 @@ export function configureLogger(options: LoggerOptions): void {
   loggerInstance = createLogger(options);
 }
 
-/**
- * Get the configured logger instance
- */
-export function getLogger() {
-  return loggerInstance;
-}
-
 // Export convenience methods that use the global logger
 export const logger = {
-  debug: (message: string, ...args: unknown[]) => loggerInstance.debug(message, ...args),
-  info: (message: string, ...args: unknown[]) => loggerInstance.info(message, ...args),
-  success: (message: string, ...args: unknown[]) => loggerInstance.success(message, ...args),
-  warn: (message: string, ...args: unknown[]) => loggerInstance.warn(message, ...args),
-  error: (message: string, ...args: unknown[]) => loggerInstance.error(message, ...args),
+  success: (message: string, ...args: unknown[]) =>
+    loggerInstance.success(message, ...args),
+  warn: (message: string, ...args: unknown[]) =>
+    loggerInstance.warn(message, ...args),
+  error: (message: string, ...args: unknown[]) =>
+    loggerInstance.error(message, ...args),
   log: (message: string) => loggerInstance.log(message),
   newline: () => loggerInstance.newline(),
   isQuiet: () => loggerInstance.isQuiet(),
-  isVerbose: () => loggerInstance.isVerbose(),
 };
