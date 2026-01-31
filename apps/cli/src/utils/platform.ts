@@ -66,16 +66,6 @@ export async function getDetectedPlatforms(projectPath: string = process.cwd()):
   return detections.filter(d => d.detected).map(d => d.platform);
 }
 
-// Check if a specific platform is available
-export async function isPlatformAvailable(
-  platform: Platform,
-  projectPath: string = process.cwd()
-): Promise<boolean> {
-  const detections = await detectPlatforms(projectPath);
-  const detection = detections.find(d => d.platform === platform);
-  return detection?.detected ?? false;
-}
-
 // Get the Claude Code home directory (~/.claude)
 export function getClaudeCodeHome(): string {
   return path.join(os.homedir(), '.claude');
@@ -93,13 +83,4 @@ export function getRulesPath(platform: Platform): string {
 // Get the skills directory (Claude Code only, always global ~/.claude/skills)
 export function getSkillsPath(): string {
   return path.join(getClaudeCodeHome(), 'skills');
-}
-
-// Get MCP config path
-export function getMcpConfigPath(platform: Platform, projectPath: string = process.cwd()): string {
-  if (platform !== 'claude-code') {
-    throw new Error(`MCP config path is not supported for platform: ${platform}`);
-  }
-
-  return path.join(os.homedir(), '.claude.json');
 }

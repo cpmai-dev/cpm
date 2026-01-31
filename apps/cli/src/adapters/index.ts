@@ -11,11 +11,3 @@ const adapters: Record<Platform, PlatformAdapter> = {
 export function getAdapter(platform: Platform): PlatformAdapter {
   return adapters[platform];
 }
-
-export function getAllAdapters(): PlatformAdapter[] {
-  return Object.values(adapters);
-}
-
-export function getSupportedPlatforms(): Platform[] {
-  return Object.keys(adapters) as Platform[];
-}

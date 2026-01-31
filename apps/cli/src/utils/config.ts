@@ -1,26 +1,9 @@
-import Conf from 'conf';
 import path from 'path';
 import os from 'os';
 import fs from 'fs-extra';
 import type { InstalledPackage } from '../types.js';
 
-// Global config store
-const config = new Conf({
-  projectName: 'cpm',
-  schema: {
-    installedPackages: {
-      type: 'array',
-      default: [],
-    },
-    registryUrl: {
-      type: 'string',
-      default: 'https://cpm-ai.dev/api',
-    },
-  },
-});
-
 export const CPM_DIR = '.cpm';
-export const REGISTRY_URL = config.get('registryUrl') as string;
 
 // Get the cpm directory for a project
 export function getCpmDir(projectPath: string = process.cwd()): string {
@@ -67,7 +50,7 @@ export async function saveInstalledPackages(
   }, { spaces: 2 });
 }
 
-// Add package to installed list
+// Add package to installed list (immutable update)
 export async function addInstalledPackage(
   pkg: InstalledPackage,
   projectPath: string = process.cwd()
@@ -75,13 +58,12 @@ export async function addInstalledPackage(
   const packages = await getInstalledPackages(projectPath);
   const existingIndex = packages.findIndex(p => p.name === pkg.name);
 
-  if (existingIndex >= 0) {
-    packages[existingIndex] = pkg;
-  } else {
-    packages.push(pkg);
-  }
+  // Use immutable patterns - create new array instead of mutating
+  const updatedPackages = existingIndex >= 0
+    ? packages.map((p, i) => i === existingIndex ? pkg : p)
+    : [...packages, pkg];
 
-  await saveInstalledPackages(packages, projectPath);
+  await saveInstalledPackages(updatedPackages, projectPath);
 }
 
 // Remove package from installed list
@@ -93,5 +75,3 @@ export async function removeInstalledPackage(
   const filtered = packages.filter(p => p.name !== packageName);
   await saveInstalledPackages(filtered, projectPath);
 }
-
-export { config };

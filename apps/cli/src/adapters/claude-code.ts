@@ -5,22 +5,151 @@ import { PlatformAdapter, InstallResult } from './base.js';
 import { getRulesPath, getSkillsPath, getClaudeCodeHome } from '../utils/platform.js';
 
 /**
+ * Allowed commands for MCP servers (security allowlist)
+ * Only these commands can be configured in .claude.json
+ */
+const ALLOWED_MCP_COMMANDS = [
+  'npx',
+  'node',
+  'python',
+  'python3',
+  'deno',
+  'bun',
+  'uvx',
+] as const;
+
+/**
+ * Blocked patterns in MCP arguments (security blocklist)
+ */
+const BLOCKED_MCP_ARG_PATTERNS = [
+  /--eval/i,
+  /-e\s/,
+  /-c\s/,
+  /\bcurl\b/i,
+  /\bwget\b/i,
+  /\brm\s/i,
+  /\bsudo\b/i,
+  /\bchmod\b/i,
+  /\bchown\b/i,
+  /[|;&`$]/,  // Shell metacharacters
+] as const;
+
+/**
+ * Validate MCP configuration for security
+ */
+function validateMcpConfig(mcp: PackageManifest['mcp']): { valid: boolean; error?: string } {
+  if (!mcp?.command) {
+    return { valid: false, error: 'MCP command is required' };
+  }
+
+  // Extract base command (handle paths like /usr/bin/node)
+  const baseCommand = path.basename(mcp.command);
+
+  if (!ALLOWED_MCP_COMMANDS.includes(baseCommand as typeof ALLOWED_MCP_COMMANDS[number])) {
+    return {
+      valid: false,
+      error: `MCP command '${baseCommand}' is not allowed. Allowed: ${ALLOWED_MCP_COMMANDS.join(', ')}`
+    };
+  }
+
+  // Check arguments for dangerous patterns
+  if (mcp.args) {
+    const argsString = mcp.args.join(' ');
+    for (const pattern of BLOCKED_MCP_ARG_PATTERNS) {
+      if (pattern.test(argsString)) {
+        return {
+          valid: false,
+          error: `MCP arguments contain blocked pattern: ${pattern.source}`
+        };
+      }
+    }
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Sanitize a single file name (not a path)
+ * Prevents path traversal via malicious file names
+ */
+function sanitizeFileName(fileName: string): { safe: boolean; sanitized: string; error?: string } {
+  if (!fileName || typeof fileName !== 'string') {
+    return { safe: false, sanitized: '', error: 'File name cannot be empty' };
+  }
+
+  // Get just the base name (no directory components)
+  const baseName = path.basename(fileName);
+
+  // Check for null bytes
+  if (baseName.includes('\0')) {
+    return { safe: false, sanitized: '', error: 'File name contains null bytes' };
+  }
+
+  // Check for hidden files (starting with .)
+  if (baseName.startsWith('.') && baseName !== '.md') {
+    return { safe: false, sanitized: '', error: 'Hidden files not allowed' };
+  }
+
+  // Remove any remaining unsafe characters
+  const sanitized = baseName.replace(/[<>:"|?*\\]/g, '_');
+
+  // Verify no path traversal after sanitization
+  if (sanitized.includes('..') || sanitized.includes('/') || sanitized.includes('\\')) {
+    return { safe: false, sanitized: '', error: 'Path traversal detected in file name' };
+  }
+
+  // Must end with .md for our use case
+  if (!sanitized.endsWith('.md')) {
+    return { safe: false, sanitized: '', error: 'Only .md files allowed' };
+  }
+
+  return { safe: true, sanitized };
+}
+
+/**
  * Sanitize package name for use as folder name
  * Converts @scope/name to scope--name (flat structure)
  * Prevents path traversal attacks
  */
 function sanitizeFolderName(name: string): string {
-  // Remove @ prefix and replace forward slashes with double dash
-  let sanitized = name.replace(/^@/, '').replace(/\//g, '--');
+  if (!name || typeof name !== 'string') {
+    throw new Error('Package name cannot be empty');
+  }
 
-  // Remove any path traversal attempts
+  // Decode any URL encoding first
+  let decoded = name;
+  try {
+    decoded = decodeURIComponent(name);
+  } catch {
+    // If decoding fails, use original
+  }
+
+  // Check for null bytes
+  if (decoded.includes('\0')) {
+    throw new Error('Invalid package name: contains null bytes');
+  }
+
+  // Remove @ prefix and replace forward slashes with double dash
+  let sanitized = decoded.replace(/^@/, '').replace(/\//g, '--');
+
+  // Remove any path traversal attempts (including encoded)
   sanitized = sanitized.replace(/\.\./g, '');
+  sanitized = sanitized.replace(/%2e%2e/gi, '');
+  sanitized = sanitized.replace(/%2f/gi, '');
+  sanitized = sanitized.replace(/%5c/gi, '');
+
   // Remove unsafe characters for file systems
   sanitized = sanitized.replace(/[<>:"|?*\\]/g, '');
 
   // Ensure the result is not empty and doesn't start with a dot
   if (!sanitized || sanitized.startsWith('.')) {
     throw new Error(`Invalid package name: ${name}`);
+  }
+
+  // Normalize and verify no escape
+  const normalized = path.normalize(sanitized);
+  if (normalized !== sanitized || normalized.includes('..')) {
+    throw new Error(`Invalid package name (path traversal detected): ${name}`);
   }
 
   // Final validation: ensure no path components escape
@@ -31,6 +160,15 @@ function sanitizeFolderName(name: string): string {
   }
 
   return sanitized;
+}
+
+/**
+ * Verify destination path is within allowed directory
+ */
+function isPathWithinDirectory(filePath: string, directory: string): boolean {
+  const resolvedPath = path.resolve(filePath);
+  const resolvedDir = path.resolve(directory);
+  return resolvedPath.startsWith(resolvedDir + path.sep) || resolvedPath === resolvedDir;
 }
 
 export class ClaudeCodeAdapter extends PlatformAdapter {
@@ -113,6 +251,9 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
         filesWritten.push(skillPath);
       }
 
+      // Remove MCP server from ~/.claude.json
+      await this.removeMcpServer(folderName, filesWritten);
+
       return {
         success: true,
         platform: 'claude-code',
@@ -128,6 +269,41 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
     }
   }
 
+  /**
+   * Remove an MCP server configuration from ~/.claude.json
+   */
+  private async removeMcpServer(serverName: string, filesWritten: string[]): Promise<void> {
+    const claudeHome = getClaudeCodeHome();
+    const mcpConfigPath = path.join(path.dirname(claudeHome), '.claude.json');
+
+    if (!await fs.pathExists(mcpConfigPath)) {
+      return;
+    }
+
+    try {
+      const config = await fs.readJson(mcpConfigPath);
+      const mcpServers = config.mcpServers as Record<string, unknown> | undefined;
+
+      if (!mcpServers || !mcpServers[serverName]) {
+        return;
+      }
+
+      // Create new config without the server (immutable)
+      const { [serverName]: _removed, ...remainingServers } = mcpServers;
+
+      const updatedConfig = {
+        ...config,
+        mcpServers: remainingServers,
+      };
+
+      await fs.writeJson(mcpConfigPath, updatedConfig, { spaces: 2 });
+      filesWritten.push(mcpConfigPath);
+    } catch (error) {
+      // Log but don't fail uninstall if MCP removal fails
+      console.warn(`Warning: Could not update MCP config: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   private async installRules(manifest: PackageManifest, _projectPath: string, packagePath?: string): Promise<string[]> {
     const filesWritten: string[] = [];
 
@@ -138,12 +314,26 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
     // If packagePath exists and has files, copy all .md files
     if (packagePath && await fs.pathExists(packagePath)) {
       const files = await fs.readdir(packagePath);
-      const mdFiles = files.filter(f => f.endsWith('.md') && f !== 'cpm.yaml');
+      const mdFiles = files.filter(f => f.endsWith('.md') && f.toLowerCase() !== 'cpm.yaml');
 
       if (mdFiles.length > 0) {
         for (const file of mdFiles) {
+          // Validate and sanitize file name for security
+          const validation = sanitizeFileName(file);
+          if (!validation.safe) {
+            console.warn(`Skipping unsafe file: ${file} (${validation.error})`);
+            continue;
+          }
+
           const srcPath = path.join(packagePath, file);
-          const destPath = path.join(rulesDir, file);
+          const destPath = path.join(rulesDir, validation.sanitized);
+
+          // Verify destination is within allowed directory
+          if (!isPathWithinDirectory(destPath, rulesDir)) {
+            console.warn(`Blocked path traversal attempt: ${file}`);
+            continue;
+          }
+
           await fs.copy(srcPath, destPath);
           filesWritten.push(destPath);
         }
@@ -180,12 +370,26 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
     // If packagePath exists and has files, copy entire folder
     if (packagePath && await fs.pathExists(packagePath)) {
       const files = await fs.readdir(packagePath);
-      const contentFiles = files.filter(f => f.endsWith('.md') && f !== 'cpm.yaml');
+      const contentFiles = files.filter(f => f.endsWith('.md') && f.toLowerCase() !== 'cpm.yaml');
 
       if (contentFiles.length > 0) {
         for (const file of contentFiles) {
+          // Validate and sanitize file name for security
+          const validation = sanitizeFileName(file);
+          if (!validation.safe) {
+            console.warn(`Skipping unsafe file: ${file} (${validation.error})`);
+            continue;
+          }
+
           const srcPath = path.join(packagePath, file);
-          const destPath = path.join(skillDir, file);
+          const destPath = path.join(skillDir, validation.sanitized);
+
+          // Verify destination is within allowed directory
+          if (!isPathWithinDirectory(destPath, skillDir)) {
+            console.warn(`Blocked path traversal attempt: ${file}`);
+            continue;
+          }
+
           await fs.copy(srcPath, destPath);
           filesWritten.push(destPath);
         }
@@ -207,6 +411,12 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
 
     if (!manifest.mcp) return filesWritten;
 
+    // Validate MCP configuration for security
+    const mcpValidation = validateMcpConfig(manifest.mcp);
+    if (!mcpValidation.valid) {
+      throw new Error(`MCP security validation failed: ${mcpValidation.error}`);
+    }
+
     // Install to global ~/.claude.json
     const claudeHome = getClaudeCodeHome();
     const mcpConfigPath = path.join(path.dirname(claudeHome), '.claude.json');
@@ -214,8 +424,16 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
     let existingConfig: Record<string, unknown> = {};
 
     if (await fs.pathExists(mcpConfigPath)) {
-      existingConfig = await fs.readJson(mcpConfigPath);
+      try {
+        existingConfig = await fs.readJson(mcpConfigPath);
+      } catch (error) {
+        console.warn(`Warning: Could not parse ${mcpConfigPath}, creating new config`);
+        existingConfig = {};
+      }
     }
+
+    // Sanitize the package name for use as key
+    const sanitizedName = sanitizeFolderName(manifest.name);
 
     // Create new config with immutable patterns (no mutation)
     const existingMcpServers = (existingConfig.mcpServers as Record<string, unknown>) || {};
@@ -224,7 +442,7 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
       ...existingConfig,
       mcpServers: {
         ...existingMcpServers,
-        [manifest.name]: {
+        [sanitizedName]: {
           command: manifest.mcp.command,
           args: manifest.mcp.args,
           env: manifest.mcp.env,

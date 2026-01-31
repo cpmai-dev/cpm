@@ -114,74 +114,9 @@ export async function searchCommand(
   }
 }
 
-/**
- * List all available packages
- */
-export async function browseCommand(options: SearchOptions): Promise<void> {
-  const spinner = ora('Fetching packages...').start();
-  const limit = parseInt(options.limit || '20', 10);
-
-  try {
-    const searchOptions: RegistrySearchOptions = {
-      limit,
-      sort: (options.sort as 'downloads' | 'stars' | 'recent' | 'name') || 'downloads',
-    };
-
-    if (options.type) {
-      searchOptions.type = options.type as PackageType;
-    }
-
-    const results = await registry.search(searchOptions);
-
-    spinner.stop();
-
-    console.log(chalk.bold(`\n📦 CPM Package Registry\n`));
-    console.log(chalk.dim(`${results.total} packages available\n`));
-
-    // Group by type
-    const byType: Record<string, typeof results.packages> = {};
-    for (const pkg of results.packages) {
-      if (!byType[pkg.type]) {
-        byType[pkg.type] = [];
-      }
-      byType[pkg.type].push(pkg);
-    }
-
-    // Display by type
-    for (const [type, packages] of Object.entries(byType)) {
-      const typeColor = typeColors[type] || chalk.white;
-      const emoji = typeEmoji[type] || '📦';
-
-      console.log(typeColor(`${emoji} ${type.toUpperCase()}`));
-      console.log(chalk.dim('─'.repeat(40)));
-
-      for (const pkg of packages) {
-        const badge = pkg.official ? chalk.hex('#f97316')(' ★') : pkg.verified ? chalk.green(' ✓') : '';
-        console.log(
-          `  ${chalk.white(pkg.name)}${badge} ${chalk.dim(`- ${truncate(pkg.description, 40)}`)}`
-        );
-      }
-
-      console.log();
-    }
-
-    // Stats
-    console.log(chalk.dim('─'.repeat(50)));
-    console.log(chalk.dim(`Install: cpm install <package>  |  Search: cpm search <query>`));
-  } catch (error) {
-    spinner.fail('Failed to fetch packages');
-    console.error(chalk.red(error instanceof Error ? error.message : 'Unknown error'));
-  }
-}
-
 function formatNumber(num: number): string {
   if (num >= 1000) {
     return `${(num / 1000).toFixed(1)}k`;
   }
   return num.toString();
-}
-
-function truncate(str: string, length: number): string {
-  if (str.length <= length) return str;
-  return str.slice(0, length - 3) + '...';
 }
