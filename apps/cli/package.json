@@ -1,6 +1,6 @@
 {
   "name": "@cpmai/cli",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "The package manager for Claude Code - cpm-ai.dev",
   "keywords": [
     "claude-code",
