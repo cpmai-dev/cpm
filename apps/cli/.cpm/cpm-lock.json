@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "packages": [
+    {
+      "name": "@official/code-review",
+      "version": "1.0.0",
+      "type": "skill",
+      "platforms": [
+        "claude-code"
+      ],
+      "installedAt": "2026-01-31T15:39:40.570Z",
+      "path": "/Users/elshanakbarov/Projects/Personal/product/cpm/apps/cli/.cpm/packages/@official/code-review"
+    },
+    {
+      "name": "@official/security-review",
+      "version": "1.0.0",
+      "type": "skill",
+      "platforms": [
+        "claude-code"
+      ],
+      "installedAt": "2026-01-31T15:59:21.412Z",
+      "path": "/Users/elshanakbarov/Projects/Personal/product/cpm/apps/cli/.cpm/packages/@official/security-review"
+    }
+  ],
+  "updatedAt": "2026-01-31T15:59:21.414Z"
+}
