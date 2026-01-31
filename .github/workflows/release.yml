@@ -48,10 +48,10 @@ jobs:
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Publish to npm (beta)
+      - name: Publish to npm
         if: steps.check.outputs.exists == 'false'
         working-directory: apps/cli
-        run: npm publish --tag beta --access public
+        run: npm publish --access public
 
       - name: Skip publish
         if: steps.check.outputs.exists == 'true'
