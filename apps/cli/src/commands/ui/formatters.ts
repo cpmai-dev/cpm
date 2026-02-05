@@ -223,7 +223,7 @@ export function formatRemovedFiles(files: string[]): string[] {
  * @example
  * ```typescript
  * const hints = formatUsageHints(skillManifest);
- * // ["  Usage: Type /my-command in Claude Code"]
+ * // ["  Usage: Type /my-command in your editor"]
  * ```
  */
 export function formatUsageHints(manifest: PackageManifest): string[] {
@@ -233,7 +233,7 @@ export function formatUsageHints(manifest: PackageManifest): string[] {
     case "skill":
       if ("skill" in manifest && manifest.skill?.command) {
         hints.push(
-          `  ${SEMANTIC_COLORS.info("Usage:")} Type ${chalk.yellow(manifest.skill.command)} in Claude Code`,
+          `  ${SEMANTIC_COLORS.info("Usage:")} Type ${chalk.yellow(manifest.skill.command)} in your editor`,
         );
       }
       break;
@@ -246,7 +246,7 @@ export function formatUsageHints(manifest: PackageManifest): string[] {
 
     case "mcp":
       hints.push(
-        `  ${SEMANTIC_COLORS.info("Usage:")} MCP server configured. Restart Claude Code to activate.`,
+        `  ${SEMANTIC_COLORS.info("Usage:")} MCP server configured. Restart your editor to activate.`,
       );
 
       // Show required environment variables

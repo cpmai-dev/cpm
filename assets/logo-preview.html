@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CPM Logo - Full Versions</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0a0a0a;
+      color: #fff;
+      min-height: 100vh;
+      padding: 60px 40px;
+    }
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 60px;
+      color: #fff;
+    }
+    .section {
+      margin-bottom: 80px;
+    }
+    .section-title {
+      font-size: 12px;
+      font-weight: 500;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 24px;
+    }
+    .logo-container {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px;
+      background: #0a0a0a;
+      border: 1px solid #222;
+      border-radius: 12px;
+    }
+    .icon-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      width: fit-content;
+    }
+    .module {
+      width: 28px;
+      height: 28px;
+      border-radius: 5px;
+      background: rgba(255,255,255,0.1);
+    }
+    .module.mid { background: rgba(255,255,255,0.25); }
+    .module.active {
+      background: #fff;
+      box-shadow: 0 0 24px rgba(34, 211, 238, 0.6), 0 0 48px rgba(163, 230, 53, 0.4);
+    }
+    .wordmark {
+      font-size: 48px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: #fff;
+      margin-top: 16px;
+    }
+    .tagline {
+      font-size: 14px;
+      color: #888;
+      margin-top: 12px;
+    }
+
+    /* Horizontal version */
+    .horizontal {
+      flex-direction: row;
+      gap: 20px;
+      align-items: center;
+    }
+    .horizontal .wordmark {
+      margin-top: 0;
+      font-size: 40px;
+    }
+    .horizontal .text-group {
+      display: flex;
+      flex-direction: column;
+    }
+    .horizontal .tagline {
+      margin-top: 4px;
+    }
+
+    /* Light versions */
+    .light-bg {
+      background: #fff;
+      padding: 60px;
+      border-radius: 12px;
+      margin-top: 24px;
+    }
+    .light-bg .logo-container {
+      background: #fff;
+      border-color: #eee;
+    }
+    .light-bg .wordmark { color: #0a0a0a; }
+    .light-bg .module { background: rgba(0,0,0,0.08); }
+    .light-bg .module.mid { background: rgba(0,0,0,0.2); }
+    .light-bg .module.active {
+      background: #0a0a0a;
+      box-shadow: 0 0 24px rgba(6, 182, 212, 0.4), 0 0 48px rgba(132, 204, 22, 0.3);
+    }
+
+    .variants {
+      display: flex;
+      gap: 40px;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>CPM Logo System</h1>
+
+  <div class="section">
+    <div class="section-title">Stacked Version (Primary)</div>
+    <div class="logo-container">
+      <div class="icon-grid">
+        <div class="module"></div>
+        <div class="module mid"></div>
+        <div class="module mid"></div>
+        <div class="module active"></div>
+      </div>
+      <div class="wordmark">CPM</div>
+      <div class="tagline">Package manager for AI coding assistants</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Horizontal Version</div>
+    <div class="logo-container horizontal">
+      <div class="icon-grid">
+        <div class="module"></div>
+        <div class="module mid"></div>
+        <div class="module mid"></div>
+        <div class="module active"></div>
+      </div>
+      <div class="text-group">
+        <div class="wordmark">CPM</div>
+        <div class="tagline">Package manager for AI coding assistants</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Light Background</div>
+    <div class="light-bg">
+      <div class="variants">
+        <div class="logo-container">
+          <div class="icon-grid">
+            <div class="module"></div>
+            <div class="module mid"></div>
+            <div class="module mid"></div>
+            <div class="module active"></div>
+          </div>
+          <div class="wordmark">CPM</div>
+          <div class="tagline">Package manager for AI coding assistants</div>
+        </div>
+
+        <div class="logo-container horizontal">
+          <div class="icon-grid">
+            <div class="module"></div>
+            <div class="module mid"></div>
+            <div class="module mid"></div>
+            <div class="module active"></div>
+          </div>
+          <div class="text-group">
+            <div class="wordmark">CPM</div>
+            <div class="tagline">Package manager for AI coding assistants</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

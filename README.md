@@ -1,8 +1,10 @@
-# CPM - Claude Package Manager
+<p align="center">
+  <img src="assets/logo-horizontal-full.svg" alt="CPM" width="400">
+</p>
 
-**The package manager for Claude Code**
-
-> One command to supercharge Claude Code with skills, rules, and MCP servers.
+<p align="center">
+  <strong>One command to install skills, rules, and MCP servers.</strong>
+</p>
 
 ```bash
 # Install a package
@@ -17,7 +19,7 @@ cpm list
 
 ## What is CPM?
 
-CPM is a CLI tool that lets you install curated packages for [Claude Code](https://claude.ai/code) - the AI coding assistant from Anthropic. Packages include:
+CPM is a CLI tool that lets you install curated packages for AI coding assistants. Packages include:
 
 - **Rules** - Guidelines and coding standards (installed to `~/.claude/rules/`)
 - **Skills** - Slash commands like `/commit`, `/review-pr` (installed to `~/.claude/skills/`)
@@ -70,12 +72,6 @@ cpm list
 cpm uninstall commit
 ```
 
-### Create a new package
-
-```bash
-cpm init
-```
-
 ### CLI Options
 
 ```bash
@@ -94,7 +90,7 @@ cpm --help
 | Type    | Description                     | Installation Location      |
 | ------- | ------------------------------- | -------------------------- |
 | `rules` | Coding guidelines and standards | `~/.claude/rules/<name>/`  |
-| `skill` | Slash commands for Claude Code  | `~/.claude/skills/<name>/` |
+| `skill` | Slash commands                  | `~/.claude/skills/<name>/` |
 | `mcp`   | MCP server integrations         | `~/.claude.json`           |
 
 ## Development
@@ -140,7 +136,17 @@ CPM implements multiple security measures:
 
 ## Contributing
 
-Contributions are welcome! Please read our contributing guidelines before submitting PRs.
+### Adding Packages
+
+Want to add your own rules, skills, or MCP servers to the registry? Submit a PR to the [packages repository](https://github.com/cpmai-dev/packages):
+
+1. Fork [cpmai-dev/packages](https://github.com/cpmai-dev/packages)
+2. Add your package with a `cpm.yaml` manifest
+3. Submit a pull request
+
+### Contributing to CPM
+
+Contributions to the CLI are welcome! Please read our contributing guidelines before submitting PRs.
 
 ## License
 

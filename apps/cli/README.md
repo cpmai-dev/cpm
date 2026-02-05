@@ -1,6 +1,6 @@
 # @cpmai/cli
 
-The command-line interface for CPM (Claude Package Manager).
+The command-line interface for CPM.
 
 ## Installation
 
@@ -55,15 +55,6 @@ List all installed packages.
 ```bash
 cpm list
 cpm ls    # Alias: ls
-```
-
-### `cpm init`
-
-Create a new `cpm.yaml` manifest file.
-
-```bash
-cpm init
-cpm init -y    # Skip prompts
 ```
 
 ### Global Options

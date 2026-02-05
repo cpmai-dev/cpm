@@ -1,0 +1,49 @@
+<svg width="280" height="180" viewBox="0 0 280 180" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradient for glow effect -->
+    <linearGradient id="glowGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#22d3ee"/>
+      <stop offset="100%" style="stop-color:#a3e635"/>
+    </linearGradient>
+
+    <!-- Glow filter -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;display=swap');
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="280" height="180" fill="#0a0a0a"/>
+
+  <!-- Module Grid Icon - Centered -->
+  <g transform="translate(114, 20)">
+    <!-- Glow behind active module -->
+    <rect x="30" y="30" width="22" height="22" rx="4" fill="url(#glowGradient)" filter="url(#glow)" opacity="0.9"/>
+
+    <!-- Top-left - 10% -->
+    <rect x="0" y="0" width="22" height="22" rx="4" fill="#ffffff" opacity="0.1"/>
+
+    <!-- Top-right - 25% -->
+    <rect x="30" y="0" width="22" height="22" rx="4" fill="#ffffff" opacity="0.25"/>
+
+    <!-- Bottom-left - 25% -->
+    <rect x="0" y="30" width="22" height="22" rx="4" fill="#ffffff" opacity="0.25"/>
+
+    <!-- Bottom-right - Active -->
+    <rect x="30" y="30" width="22" height="22" rx="4" fill="#ffffff"/>
+  </g>
+
+  <!-- CPM Text - Centered -->
+  <text x="140" y="115" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="42" font-weight="600" fill="#ffffff" letter-spacing="0.02em" text-anchor="middle">CPM</text>
+
+  <!-- Tagline - Centered -->
+  <text x="140" y="150" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="400" fill="#888888" text-anchor="middle">Package manager for AI coding assistants</text>
+</svg>

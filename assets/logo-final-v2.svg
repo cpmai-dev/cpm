@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradient glow filter -->
+    <filter id="glowFilter" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Cyan to Lime gradient for glow -->
+    <linearGradient id="glowGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#22d3ee"/>
+      <stop offset="100%" style="stop-color:#a3e635"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Icon centered -->
+  <g transform="translate(256, 200)">
+    <!-- Glow layer behind white box -->
+    <rect x="30" y="30" width="70" height="70" rx="12" fill="url(#glowGradient)" filter="url(#glowFilter)" opacity="0.9"/>
+
+    <!-- Module grid - tight spacing -->
+    <rect x="-100" y="-100" width="70" height="70" rx="12" fill="#ffffff" opacity="0.10"/>
+    <rect x="30" y="-100" width="70" height="70" rx="12" fill="#ffffff" opacity="0.25"/>
+    <rect x="-100" y="30" width="70" height="70" rx="12" fill="#ffffff" opacity="0.25"/>
+    <!-- Active module - WHITE with gradient glow behind -->
+    <rect x="30" y="30" width="70" height="70" rx="12" fill="#ffffff"/>
+  </g>
+
+  <!-- CPM Text -->
+  <text x="256" y="400" fill="#ffffff" font-family="system-ui, -apple-system, BlinkMacSystemFont, sans-serif"
+        font-size="72" font-weight="700" text-anchor="middle" letter-spacing="-2">
+    CPM
+  </text>
+
+  <!-- Tagline -->
+  <text x="256" y="445" fill="#555555" font-family="system-ui, -apple-system, BlinkMacSystemFont, sans-serif"
+        font-size="16" font-weight="500" text-anchor="middle" letter-spacing="3">
+    AI AGENT PACKAGES
+  </text>
+</svg>
