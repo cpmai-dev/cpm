@@ -51,7 +51,7 @@ jobs:
       - name: Publish to npm
         if: steps.check.outputs.exists == 'false'
         working-directory: apps/cli
-        run: npm publish --access public
+        run: npm publish --access public --tag latest
 
       - name: Skip publish
         if: steps.check.outputs.exists == 'true'
