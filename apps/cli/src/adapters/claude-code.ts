@@ -4,14 +4,11 @@
  */
 
 import type { PackageManifest } from "../types.js";
+import { isMcpManifest, isSkillManifest, isRulesManifest } from "../types.js";
 import { PlatformAdapter, InstallResult } from "./base.js";
 import { handlerRegistry } from "./handlers/index.js";
 import { sanitizeFolderName } from "../security/index.js";
-import {
-  getRulesPath,
-  getSkillsPath,
-  getClaudeCodeHome,
-} from "../utils/platform.js";
+import { getRulesPath, getSkillsPath } from "../utils/platform.js";
 import { logger } from "../utils/logger.js";
 import fs from "fs-extra";
 import path from "path";
@@ -53,10 +50,11 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
 
   async uninstall(
     packageName: string,
-    _projectPath: string,
+    projectPath: string,
   ): Promise<InstallResult> {
     const filesWritten: string[] = [];
     const folderName = sanitizeFolderName(packageName);
+    const context = { projectPath };
 
     try {
       const rulesBaseDir = getRulesPath("claude-code");
@@ -73,7 +71,12 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
         filesWritten.push(skillPath);
       }
 
-      await this.removeMcpServer(folderName, filesWritten);
+      // Delegate MCP removal to the handler instead of duplicating logic
+      if (handlerRegistry.hasHandler("mcp")) {
+        const mcpHandler = handlerRegistry.getHandler("mcp");
+        const mcpFiles = await mcpHandler.uninstall(packageName, context);
+        filesWritten.push(...mcpFiles);
+      }
 
       return {
         success: true,
@@ -106,58 +109,28 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
     manifest: PackageManifest,
     context: { projectPath: string; packagePath?: string },
   ): Promise<string[]> {
-    if ("skill" in manifest && manifest.skill) {
+    // Use proper type guards instead of duck-typing with 'in' operator.
+    // This prevents a manifest with type "agent" but a stray "mcp" field
+    // from being routed to the MCP handler.
+    logger.warn(
+      `No handler registered for type "${manifest.type}", attempting content-based detection`,
+    );
+
+    if (isSkillManifest(manifest)) {
       const handler = handlerRegistry.getHandler("skill");
       return handler.install(manifest, context);
     }
 
-    if ("mcp" in manifest && manifest.mcp) {
+    if (isMcpManifest(manifest)) {
       const handler = handlerRegistry.getHandler("mcp");
       return handler.install(manifest, context);
     }
 
-    if ("universal" in manifest && manifest.universal?.rules) {
+    if (isRulesManifest(manifest)) {
       const handler = handlerRegistry.getHandler("rules");
       return handler.install(manifest, context);
     }
 
     return [];
-  }
-
-  private async removeMcpServer(
-    serverName: string,
-    filesWritten: string[],
-  ): Promise<void> {
-    const claudeHome = getClaudeCodeHome();
-    const mcpConfigPath = path.join(path.dirname(claudeHome), ".claude.json");
-
-    if (!(await fs.pathExists(mcpConfigPath))) {
-      return;
-    }
-
-    try {
-      const config = await fs.readJson(mcpConfigPath);
-      const mcpServers = config.mcpServers as
-        | Record<string, unknown>
-        | undefined;
-
-      if (!mcpServers || !mcpServers[serverName]) {
-        return;
-      }
-
-      const { [serverName]: _removed, ...remainingServers } = mcpServers;
-
-      const updatedConfig = {
-        ...config,
-        mcpServers: remainingServers,
-      };
-
-      await fs.writeJson(mcpConfigPath, updatedConfig, { spaces: 2 });
-      filesWritten.push(mcpConfigPath);
-    } catch (error) {
-      logger.warn(
-        `Could not update MCP config: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
-    }
   }
 }

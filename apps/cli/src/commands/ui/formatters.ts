@@ -249,11 +249,14 @@ export function formatUsageHints(manifest: PackageManifest): string[] {
         `  ${SEMANTIC_COLORS.info("Usage:")} MCP server configured. Restart your editor to activate.`,
       );
 
-      // Show required environment variables
       if ("mcp" in manifest && manifest.mcp?.env) {
         const envVars = Object.keys(manifest.mcp.env);
         if (envVars.length > 0) {
-          hints.push(chalk.yellow(`\n  Required environment variables:`));
+          hints.push(
+            chalk.yellow(
+              `\n  Configure these environment variables in ~/.claude.json:`,
+            ),
+          );
           for (const envVar of envVars) {
             hints.push(chalk.dim(`    - ${envVar}`));
           }

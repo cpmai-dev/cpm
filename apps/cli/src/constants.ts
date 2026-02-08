@@ -201,13 +201,61 @@ export const ALLOWED_MCP_COMMANDS = [
  */
 export const BLOCKED_MCP_ARG_PATTERNS = [
   /--eval/i, // Node.js eval flag
-  /-e\s/, // Short eval flag with space
-  /-c\s/, // Command flag with space
+  /-e(?:\s|$)/, // Short eval flag (with space or at end)
+  /^-e\S/, // Concatenated eval flag (e.g., -eCODE)
+  /-c(?:\s|$)/, // Command flag (with space or at end)
   /\bcurl\b/i, // curl command (data exfiltration)
   /\bwget\b/i, // wget command (data exfiltration)
-  /\brm\s/i, // rm command (file deletion)
+  /\brm(?:\s|$)/i, // rm command (file deletion)
   /\bsudo\b/i, // sudo command (privilege escalation)
   /\bchmod\b/i, // chmod command (permission changes)
   /\bchown\b/i, // chown command (ownership changes)
   /[|;&`$]/, // Shell metacharacters (command chaining/injection)
+  /--inspect/i, // Node.js debugger (remote code execution)
+  /--allow-all/i, // Deno sandbox bypass
+  /--allow-run/i, // Deno run permission
+  /--allow-write/i, // Deno write permission
+  /--allow-net/i, // Deno net permission
+  /^https?:\/\//i, // Remote URLs as standalone args (script loading)
+] as const;
+
+// ============================================================================
+// Security: Blocked MCP Environment Variables
+// ============================================================================
+
+/**
+ * Blocked environment variable names for MCP servers.
+ *
+ * These environment variables can alter how commands execute,
+ * potentially bypassing the command allowlist entirely:
+ *
+ * - NODE_OPTIONS: Forces Node.js to load arbitrary code
+ * - LD_PRELOAD/DYLD_INSERT_LIBRARIES: Injects shared libraries
+ * - PATH: Redirects command resolution to attacker binaries
+ * - PYTHONPATH/PYTHONSTARTUP: Hijacks Python module loading
+ * - NPM_CONFIG_REGISTRY/NPM_CONFIG_PREFIX: Redirects npm operations
+ */
+export const BLOCKED_MCP_ENV_KEYS = [
+  "PATH",
+  "LD_PRELOAD",
+  "LD_LIBRARY_PATH",
+  "DYLD_INSERT_LIBRARIES",
+  "DYLD_LIBRARY_PATH",
+  "NODE_OPTIONS",
+  "NODE_PATH",
+  "PYTHONPATH",
+  "PYTHONSTARTUP",
+  "PYTHONHOME",
+  "RUBYOPT",
+  "PERL5OPT",
+  "BASH_ENV",
+  "ENV",
+  "CDPATH",
+  "HOME",
+  "USERPROFILE",
+  "NPM_CONFIG_REGISTRY",
+  "NPM_CONFIG_PREFIX",
+  "NPM_CONFIG_GLOBALCONFIG",
+  "DENO_DIR",
+  "BUN_INSTALL",
 ] as const;

@@ -16,10 +16,10 @@
  * @see https://owasp.org/www-community/attacks/Command_Injection
  */
 
-import path from "path";
 import {
   ALLOWED_MCP_COMMANDS,
   BLOCKED_MCP_ARG_PATTERNS,
+  BLOCKED_MCP_ENV_KEYS,
 } from "../constants.js";
 import type { ValidationResult } from "../types.js";
 
@@ -90,13 +90,16 @@ export interface McpConfig {
 function isAllowedCommand(
   command: string,
 ): command is (typeof ALLOWED_MCP_COMMANDS)[number] {
-  // Extract just the command name from potential absolute paths
-  // e.g., "/usr/local/bin/node" becomes "node"
-  const baseCommand = path.basename(command);
+  // Reject commands with path separators to prevent symlink bypass attacks.
+  // Only bare command names (e.g., "npx", "node") are accepted.
+  // This prevents "/tmp/evil/npx" -> symlink to bash from passing validation.
+  if (command.includes("/") || command.includes("\\")) {
+    return false;
+  }
 
   // Check if it's in our allowlist
   return ALLOWED_MCP_COMMANDS.includes(
-    baseCommand as (typeof ALLOWED_MCP_COMMANDS)[number],
+    command as (typeof ALLOWED_MCP_COMMANDS)[number],
   );
 }
 
@@ -123,19 +126,46 @@ function isAllowedCommand(
  * ```
  */
 function containsBlockedPattern(args: string[]): RegExp | null {
-  // Join all arguments into a single string for pattern matching
-  // This catches patterns that might span multiple arguments
-  const argsString = args.join(" ");
+  // Check each argument individually AND as joined string.
+  // Individual checks catch per-arg attacks; joined catches cross-arg patterns.
+  for (const arg of args) {
+    for (const pattern of BLOCKED_MCP_ARG_PATTERNS) {
+      if (pattern.test(arg)) {
+        return pattern;
+      }
+    }
+  }
 
-  // Check each blocked pattern
+  const argsString = args.join(" ");
   for (const pattern of BLOCKED_MCP_ARG_PATTERNS) {
     if (pattern.test(argsString)) {
-      // Return the pattern that matched (for error message)
       return pattern;
     }
   }
 
-  // No blocked patterns found - arguments are safe
+  return null;
+}
+
+/**
+ * Check if environment variables contain blocked keys.
+ *
+ * Certain environment variables can fundamentally alter how commands
+ * execute, bypassing the command allowlist entirely. For example,
+ * NODE_OPTIONS=--require /path/to/evil.js forces Node.js to load
+ * arbitrary code before the legitimate MCP server.
+ *
+ * @param env - Environment variables to check
+ * @returns Error message if a blocked key is found, null if safe
+ */
+function containsBlockedEnvKey(env: Record<string, string>): string | null {
+  const blockedSet = new Set(BLOCKED_MCP_ENV_KEYS.map((k) => k.toUpperCase()));
+
+  for (const key of Object.keys(env)) {
+    if (blockedSet.has(key.toUpperCase())) {
+      return key;
+    }
+  }
+
   return null;
 }
 
@@ -175,14 +205,12 @@ export function validateMcpConfig(
     return { valid: false, error: "MCP command is required" };
   }
 
-  // Get the base command name for the error message
-  const baseCommand = path.basename(mcp.command);
-
   // SECURITY CHECK 1: Verify command is in the allowlist
+  // Only bare command names are accepted (no paths like /usr/bin/node)
   if (!isAllowedCommand(mcp.command)) {
     return {
       valid: false,
-      error: `MCP command '${baseCommand}' is not allowed. Allowed: ${ALLOWED_MCP_COMMANDS.join(", ")}`,
+      error: `MCP command '${mcp.command}' is not allowed. Allowed: ${ALLOWED_MCP_COMMANDS.join(", ")}`,
     };
   }
 
@@ -194,6 +222,20 @@ export function validateMcpConfig(
       return {
         valid: false,
         error: `MCP arguments contain blocked pattern: ${blockedPattern.source}`,
+      };
+    }
+  }
+
+  // SECURITY CHECK 3: Validate environment variables
+  // Certain env vars can bypass the command allowlist entirely
+  // (e.g., NODE_OPTIONS=--require /path/to/evil.js)
+  if (mcp.env) {
+    const blockedKey = containsBlockedEnvKey(mcp.env);
+
+    if (blockedKey) {
+      return {
+        valid: false,
+        error: `MCP environment variable '${blockedKey}' is not allowed. It could be used to bypass command security restrictions.`,
       };
     }
   }

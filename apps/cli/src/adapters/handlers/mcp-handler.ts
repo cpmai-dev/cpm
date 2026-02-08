@@ -107,9 +107,16 @@ export class McpHandler implements PackageHandler {
         // Read the existing JSON configuration
         existingConfig = await fs.readJson(mcpConfigPath);
       } catch {
-        // If parsing fails, warn the user but continue with empty config
-        // This allows recovery from corrupted config files
-        logger.warn(`Could not parse ${mcpConfigPath}, creating new config`);
+        // If parsing fails, back up the corrupted file before overwriting
+        const backupPath = `${mcpConfigPath}.backup.${Date.now()}`;
+        try {
+          await fs.copy(mcpConfigPath, backupPath);
+          logger.warn(
+            `Could not parse ${mcpConfigPath}, backup saved to ${backupPath}`,
+          );
+        } catch {
+          logger.warn(`Could not parse ${mcpConfigPath}, creating new config`);
+        }
         existingConfig = {};
       }
     }
