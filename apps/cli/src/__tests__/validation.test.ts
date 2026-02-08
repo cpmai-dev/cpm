@@ -57,7 +57,9 @@ describe("validatePackageName", () => {
       const longName = "a".repeat(215);
       const result = validatePackageName(longName);
       expect(result.valid).toBe(false);
-      expect(result.error).toContain("too long");
+      if (!result.valid) {
+        expect(result.error).toContain("too long");
+      }
     });
 
     it("should accept names with uppercase letters (case-insensitive)", () => {
@@ -134,10 +136,12 @@ describe("validatePackageName", () => {
       const result = validatePackageName("package%2fname");
       expect(result.valid).toBe(false);
       // Could be either error depending on which check triggers first
-      expect([
-        "Invalid characters in package name",
-        "Invalid package name format",
-      ]).toContain(result.error);
+      if (!result.valid) {
+        expect([
+          "Invalid characters in package name",
+          "Invalid package name format",
+        ]).toContain(result.error);
+      }
     });
   });
 
