@@ -2,11 +2,15 @@
 
 import { Command } from "commander";
 import chalk from "chalk";
+import { createRequire } from "module";
 import { installCommand } from "./commands/install.js";
 import { searchCommand } from "./commands/search.js";
 import { listCommand } from "./commands/list.js";
 import { uninstallCommand } from "./commands/uninstall.js";
 import { configureLogger } from "./utils/logger.js";
+
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json") as { version: string };
 
 const program = new Command();
 
@@ -25,7 +29,7 @@ program
   .description(
     `${logo}\n  ${chalk.dim("Package manager for AI coding assistants")}\n`,
   )
-  .version("0.2.0-beta.1")
+  .version(version)
   .option("-q, --quiet", "Suppress all output except errors")
   .option("-v, --verbose", "Enable verbose output for debugging")
   .hook("preAction", (thisCommand) => {
