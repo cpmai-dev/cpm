@@ -14,7 +14,7 @@
 
 import fs from "fs-extra";
 import path from "path";
-import type { PackageManifest, PackageMetadata } from "../../types.js";
+import type { PackageManifest } from "../../types.js";
 import { isRulesManifest } from "../../types.js";
 import { getRulesPath } from "../../utils/platform.js";
 import { logger } from "../../utils/logger.js";
@@ -28,58 +28,7 @@ import type {
   InstallContext,
   UninstallContext,
 } from "./types.js";
-
-/**
- * Write package metadata to the package folder.
- *
- * This creates a .cpm.json file that tracks:
- * - Package name and version
- * - Package type
- * - When it was installed
- *
- * This metadata is used by the `cpm list` command to show installed packages.
- *
- * @param packageDir - The directory where the package is installed
- * @param manifest - The package manifest containing name, version, etc.
- * @returns The path to the created metadata file
- *
- * @example
- * ```typescript
- * const metadataPath = await writePackageMetadata(
- *   "/Users/dev/.claude/rules/typescript-strict",
- *   manifest
- * );
- * // Creates: /Users/dev/.claude/rules/typescript-strict/.cpm.json
- * ```
- */
-async function writePackageMetadata(
-  packageDir: string,
-  manifest: PackageManifest,
-): Promise<string> {
-  // Create the metadata object with essential tracking information
-  const metadata: PackageMetadata = {
-    name: manifest.name, // e.g., "@cpm/typescript-strict"
-    version: manifest.version, // e.g., "1.0.0"
-    type: manifest.type, // e.g., "rules"
-    installedAt: new Date().toISOString(), // ISO timestamp for when it was installed
-  };
-
-  // Build the path to the metadata file
-  const metadataPath = path.join(packageDir, ".cpm.json");
-
-  try {
-    // Write the metadata as formatted JSON (spaces: 2 for readability)
-    await fs.writeJson(metadataPath, metadata, { spaces: 2 });
-  } catch (error) {
-    // Metadata writing is non-critical - warn but don't fail installation
-    logger.warn(
-      `Could not write metadata: ${error instanceof Error ? error.message : "Unknown error"}`,
-    );
-  }
-
-  // Return the path regardless of success (caller tracks it)
-  return metadataPath;
-}
+import { writePackageMetadata } from "./metadata.js";
 
 /**
  * Handler for rules packages.
@@ -175,6 +124,13 @@ export class RulesHandler implements PackageHandler {
           // This prevents any path traversal that might slip through
           if (!isPathWithinDirectory(destPath, rulesDir)) {
             logger.warn(`Blocked path traversal attempt: ${file}`);
+            continue;
+          }
+
+          // Check for symlinks to prevent symlink-based attacks
+          const srcStat = await fs.lstat(srcPath);
+          if (srcStat.isSymbolicLink()) {
+            logger.warn(`Blocked symlink in package: ${file}`);
             continue;
           }
 

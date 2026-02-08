@@ -86,3 +86,15 @@ export { sanitizeFileName, sanitizeFolderName } from "./file-sanitizer.js";
  * - resolveSecurePath: Resolves a path and validates it in one step
  */
 export { isPathWithinDirectory, resolveSecurePath } from "./path-validator.js";
+
+// ============================================================================
+// Glob Validation Exports
+// ============================================================================
+
+/**
+ * Functions for validating glob patterns.
+ *
+ * - validateGlob: Validates a single glob pattern against blocked patterns
+ * - validateGlobs: Validates an array of glob patterns
+ */
+export { validateGlob, validateGlobs } from "./glob-validator.js";

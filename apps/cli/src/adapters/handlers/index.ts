@@ -47,13 +47,6 @@ export type {
  */
 export { HandlerRegistry, handlerRegistry } from "./handler-registry.js";
 
-/**
- * Export individual handler classes for direct use or testing.
- */
-export { RulesHandler } from "./rules-handler.js";
-export { SkillHandler } from "./skill-handler.js";
-export { McpHandler } from "./mcp-handler.js";
-
 // ============================================================================
 // Imports for Initialization
 // ============================================================================

@@ -5,6 +5,4 @@ export default defineConfig({
   format: ["esm"],
   dts: true,
   clean: true,
-  // Bundle workspace packages into the output
-  noExternal: ["@cpm/registry-client", "@cpm/types"],
 });

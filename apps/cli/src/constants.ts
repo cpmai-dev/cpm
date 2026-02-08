@@ -37,28 +37,6 @@ export const TIMEOUTS = {
 } as const;
 
 // ============================================================================
-// Path Configuration
-// ============================================================================
-
-/**
- * Directory and path constants.
- *
- * These define where CPM stores its files and caches.
- * All paths are relative to the user's home directory.
- *
- * @property RULES_DIR - Subdirectory for rules packages ("rules")
- * @property SKILLS_DIR - Subdirectory for skill packages ("skills")
- * @property CACHE_DIR - Directory for caching registry data (".cpm/cache")
- * @property CACHE_FILE - Filename for the cached registry ("registry.json")
- */
-export const PATHS = {
-  RULES_DIR: "rules", // ~/.claude/rules/
-  SKILLS_DIR: "skills", // ~/.claude/skills/
-  CACHE_DIR: ".cpm/cache", // ~/.cpm/cache/
-  CACHE_FILE: "registry.json", // ~/.cpm/cache/registry.json
-} as const;
-
-// ============================================================================
 // Validation Limits
 // ============================================================================
 
@@ -137,9 +115,7 @@ export const SEARCH_SORT_OPTIONS = [
  * Currently, CPM only supports Claude Code, but this array
  * allows for future expansion to other platforms.
  */
-export const VALID_PLATFORMS = [
-  "claude-code", // Currently the only supported platform
-] as const;
+export const VALID_PLATFORMS = ["claude-code", "cursor"] as const;
 
 // ============================================================================
 // Security: MCP Command Allowlist
@@ -204,6 +180,7 @@ export const BLOCKED_MCP_ARG_PATTERNS = [
   /-e(?:\s|$)/, // Short eval flag (with space or at end)
   /^-e\S/, // Concatenated eval flag (e.g., -eCODE)
   /-c(?:\s|$)/, // Command flag (with space or at end)
+  /^-c\S/, // Concatenated command flag (e.g., -cCODE)
   /\bcurl\b/i, // curl command (data exfiltration)
   /\bwget\b/i, // wget command (data exfiltration)
   /\brm(?:\s|$)/i, // rm command (file deletion)

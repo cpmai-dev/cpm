@@ -23,7 +23,7 @@
 import type { PackageManifest, Platform } from "../types.js";
 import type { InstallResult as AdapterInstallResult } from "../adapters/base.js";
 import { getAdapter } from "../adapters/index.js";
-import { ensureClaudeDirs } from "../utils/config.js";
+import { ensureClaudeDirs, ensureCursorDirs } from "../utils/config.js";
 import { registry } from "../utils/registry.js";
 import { downloadPackage, cleanupTempDir } from "../utils/downloader.js";
 import { logger } from "../utils/logger.js";
@@ -253,7 +253,11 @@ export async function installCommand(
     const targetPlatforms = [options.platform] as const;
     spinner.update(`Installing to ${targetPlatforms.join(", ")}...`);
 
-    await ensureClaudeDirs();
+    if (options.platform === "cursor") {
+      await ensureCursorDirs(process.cwd());
+    } else {
+      await ensureClaudeDirs();
+    }
     const results = await installToPlatforms(
       manifest,
       tempDir,

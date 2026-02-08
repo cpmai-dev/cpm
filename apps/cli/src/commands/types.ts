@@ -11,7 +11,7 @@
  * - Type guards validate raw CLI input
  */
 
-import type { PackageType, Platform, PackageManifest } from "../types.js";
+import type { PackageType, Platform } from "../types.js";
 import { isPackageType, isSearchSort, isValidPlatform } from "../types.js";
 import { SEARCH_SORT_OPTIONS } from "../constants.js";
 
@@ -175,118 +175,6 @@ export function parseSearchOptions(
 }
 
 // ============================================================================
-// Command Result Types
-// ============================================================================
-
-/**
- * Base result type for all commands.
- *
- * Uses discriminated union pattern for type-safe result handling.
- */
-interface BaseCommandResult {
-  /** Whether the command succeeded */
-  success: boolean;
-}
-
-/**
- * Successful install result.
- */
-export interface InstallSuccess extends BaseCommandResult {
-  success: true;
-  /** The installed package manifest */
-  manifest: PackageManifest;
-  /** Files that were created */
-  filesCreated: string[];
-  /** Platforms the package was installed to */
-  platforms: Platform[];
-}
-
-/**
- * Failed install result.
- */
-export interface InstallFailure extends BaseCommandResult {
-  success: false;
-  /** Error message describing what went wrong */
-  error: string;
-  /** The stage at which installation failed */
-  stage: "validation" | "lookup" | "download" | "install";
-}
-
-/**
- * Install command result - discriminated union.
- */
-export type InstallResult = InstallSuccess | InstallFailure;
-
-/**
- * Type guard to check if install result is successful.
- *
- * @param result - The install result to check
- * @returns True if successful
- */
-export function isInstallSuccess(
-  result: InstallResult,
-): result is InstallSuccess {
-  return result.success === true;
-}
-
-/**
- * Successful search result.
- */
-export interface SearchSuccess extends BaseCommandResult {
-  success: true;
-  /** Total number of matching packages */
-  total: number;
-  /** The matching packages */
-  packages: import("../types.js").RegistryPackage[];
-}
-
-/**
- * Failed search result.
- */
-export interface SearchFailure extends BaseCommandResult {
-  success: false;
-  /** Error message */
-  error: string;
-}
-
-/**
- * Search command result - discriminated union.
- */
-export type SearchResult = SearchSuccess | SearchFailure;
-
-/**
- * Type guard to check if search result is successful.
- */
-export function isSearchSuccess(result: SearchResult): result is SearchSuccess {
-  return result.success === true;
-}
-
-/**
- * Successful uninstall result.
- */
-export interface UninstallSuccess extends BaseCommandResult {
-  success: true;
-  /** Files that were removed */
-  filesRemoved: string[];
-  /** Whether the package was actually found */
-  found: boolean;
-}
-
-/**
- * Failed uninstall result.
- */
-export interface UninstallFailure extends BaseCommandResult {
-  success: false;
-  /** Error message */
-  error: string;
-}
-
-/**
- * Uninstall command result - discriminated union.
- */
-export type UninstallResult = UninstallSuccess | UninstallFailure;
-
-// ============================================================================
 // List Command Types
 // ============================================================================
 
@@ -304,6 +192,8 @@ export interface InstalledPackage {
   version?: string;
   /** Absolute path to the package location */
   path: string;
+  /** Platform this package is installed for */
+  platform?: "claude-code" | "cursor";
 }
 
 /**

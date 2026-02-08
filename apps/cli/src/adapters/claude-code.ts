@@ -7,11 +7,7 @@ import type { PackageManifest } from "../types.js";
 import { isMcpManifest, isSkillManifest, isRulesManifest } from "../types.js";
 import { PlatformAdapter, InstallResult } from "./base.js";
 import { handlerRegistry } from "./handlers/index.js";
-import { sanitizeFolderName } from "../security/index.js";
-import { getRulesPath, getSkillsPath } from "../utils/platform.js";
 import { logger } from "../utils/logger.js";
-import fs from "fs-extra";
-import path from "path";
 
 export class ClaudeCodeAdapter extends PlatformAdapter {
   platform = "claude-code" as const;
@@ -53,29 +49,16 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
     projectPath: string,
   ): Promise<InstallResult> {
     const filesWritten: string[] = [];
-    const folderName = sanitizeFolderName(packageName);
     const context = { projectPath };
 
     try {
-      const rulesBaseDir = getRulesPath("claude-code");
-      const rulesPath = path.join(rulesBaseDir, folderName);
-      if (await fs.pathExists(rulesPath)) {
-        await fs.remove(rulesPath);
-        filesWritten.push(rulesPath);
-      }
-
-      const skillsDir = getSkillsPath();
-      const skillPath = path.join(skillsDir, folderName);
-      if (await fs.pathExists(skillPath)) {
-        await fs.remove(skillPath);
-        filesWritten.push(skillPath);
-      }
-
-      // Delegate MCP removal to the handler instead of duplicating logic
-      if (handlerRegistry.hasHandler("mcp")) {
-        const mcpHandler = handlerRegistry.getHandler("mcp");
-        const mcpFiles = await mcpHandler.uninstall(packageName, context);
-        filesWritten.push(...mcpFiles);
+      // Delegate to all registered handlers
+      for (const type of ["rules", "skill", "mcp"] as const) {
+        if (handlerRegistry.hasHandler(type)) {
+          const handler = handlerRegistry.getHandler(type);
+          const files = await handler.uninstall(packageName, context);
+          filesWritten.push(...files);
+        }
       }
 
       return {

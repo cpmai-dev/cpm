@@ -11,9 +11,20 @@ import { resolvePackageType } from "../types.js";
 import { LIMITS, TIMEOUTS } from "../constants.js";
 
 // Registry configuration
-const DEFAULT_REGISTRY_URL =
-  process.env.CPM_REGISTRY_URL ||
-  "https://raw.githubusercontent.com/cpmai-dev/packages/main/registry.json";
+function getRegistryUrl(): string {
+  const envUrl = process.env.CPM_REGISTRY_URL;
+  if (envUrl) {
+    if (!envUrl.startsWith("https://")) {
+      throw new Error(
+        "CPM_REGISTRY_URL must use HTTPS. HTTP registries are not allowed for security reasons.",
+      );
+    }
+    return envUrl;
+  }
+  return "https://raw.githubusercontent.com/cpmai-dev/packages/main/registry.json";
+}
+
+const DEFAULT_REGISTRY_URL = getRegistryUrl();
 const CACHE_DIR = path.join(os.homedir(), ".cpm", "cache");
 const CACHE_FILE = path.join(CACHE_DIR, "registry.json");
 
