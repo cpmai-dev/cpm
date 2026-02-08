@@ -164,7 +164,7 @@ export class CursorRulesHandler implements PackageHandler {
   }
 
   private getRulesContent(manifest: PackageManifest): string | undefined {
-    if (isRulesManifest(manifest)) {
+    if (isRulesManifest(manifest) && manifest.universal) {
       return manifest.universal.rules || manifest.universal.prompt;
     }
     return undefined;

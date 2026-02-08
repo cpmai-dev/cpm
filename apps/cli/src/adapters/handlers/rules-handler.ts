@@ -221,13 +221,9 @@ export class RulesHandler implements PackageHandler {
    * @returns The rules content string, or undefined if none exists
    */
   private getRulesContent(manifest: PackageManifest): string | undefined {
-    // Use the type guard to safely access rules-specific properties
-    if (isRulesManifest(manifest)) {
-      // Return rules content, falling back to prompt if rules is empty
+    if (isRulesManifest(manifest) && manifest.universal) {
       return manifest.universal.rules || manifest.universal.prompt;
     }
-
-    // Not a rules manifest, no content available
     return undefined;
   }
 }
