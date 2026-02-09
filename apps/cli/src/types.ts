@@ -75,8 +75,8 @@ interface BaseManifest {
  */
 export interface RulesManifest extends BaseManifest {
   type: "rules";
-  universal: {
-    rules: string;
+  universal?: {
+    rules?: string;
     globs?: string[];
     prompt?: string;
   };

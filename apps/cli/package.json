@@ -1,6 +1,6 @@
 {
   "name": "@cpmai/cli",
-  "version": "0.3.0-beta.3",
+  "version": "0.3.0-beta.4",
   "description": "CPM CLI - cpm-ai.dev",
   "keywords": [
     "claude-code",
@@ -29,14 +29,16 @@
   ],
   "scripts": {
     "dev": "tsx src/index.ts",
+    "clean": "rimraf dist",
     "build": "tsup",
+    "build:clean": "pnpm run clean && pnpm run build",
     "start": "node dist/index.js",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "pnpm run build:clean"
   },
   "dependencies": {
     "chalk": "^5.4.1",
@@ -52,6 +54,7 @@
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^22.10.0",
     "@types/tar": "^6.1.13",
+    "rimraf": "^6.1.2",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.0",
