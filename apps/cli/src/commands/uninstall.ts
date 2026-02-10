@@ -11,9 +11,9 @@
  * ```
  */
 
-import { getAdapter } from "../adapters/index.js";
+import { getAllAdapters } from "../adapters/index.js";
 import { logger } from "../utils/logger.js";
-import { VALID_PLATFORMS } from "../constants.js";
+import { sanitizeFolderName } from "../security/index.js";
 
 // Import UI layer
 import {
@@ -25,13 +25,6 @@ import {
   SEMANTIC_COLORS,
 } from "./ui/index.js";
 
-function extractFolderName(packageName: string): string {
-  if (packageName.includes("/")) {
-    return packageName.split("/").pop() || packageName;
-  }
-  return packageName.replace(/^@/, "");
-}
-
 function displayRemovedFiles(files: string[]): void {
   logger.log(SEMANTIC_COLORS.dim("\nFiles removed:"));
   const formatted = formatRemovedFiles(files);
@@ -42,19 +35,26 @@ export async function uninstallCommand(packageName: string): Promise<void> {
   const spinner = createSpinner(spinnerText("Uninstalling", packageName));
 
   try {
-    const folderName = extractFolderName(packageName);
+    let folderName: string;
+    try {
+      folderName = sanitizeFolderName(packageName);
+    } catch (error) {
+      spinner.fail(`Invalid package name: ${packageName}`);
+      logger.error(error instanceof Error ? error.message : "Invalid input");
+      return;
+    }
+
     const allFilesRemoved: string[] = [];
 
-    // Try uninstalling from all platforms
-    for (const platform of VALID_PLATFORMS) {
+    // Try uninstalling from all registered adapters
+    for (const adapter of getAllAdapters()) {
       try {
-        const adapter = getAdapter(platform);
         const result = await adapter.uninstall(folderName, process.cwd());
         if (result.success) {
           allFilesRemoved.push(...result.filesWritten);
         }
       } catch {
-        // Adapter may not exist for this platform, skip
+        // Adapter may fail for this platform, skip
       }
     }
 

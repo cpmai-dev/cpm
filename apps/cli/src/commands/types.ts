@@ -13,7 +13,8 @@
 
 import type { PackageType, Platform } from "../types.js";
 import { isPackageType, isSearchSort, isValidPlatform } from "../types.js";
-import { SEARCH_SORT_OPTIONS } from "../constants.js";
+import { SEARCH_SORT_OPTIONS, VALID_PLATFORMS } from "../constants.js";
+import { getDefaultPlatform } from "../utils/cpm-config.js";
 
 // ============================================================================
 // Search Sort Type
@@ -45,8 +46,8 @@ export interface RawInstallOptions {
  * After validation, we have type-safe options.
  */
 export interface InstallOptions {
-  /** Target platform for installation */
-  platform: Platform;
+  /** Target platforms for installation */
+  platforms: Platform[];
   /** Specific version to install (optional) */
   version?: string;
 }
@@ -55,38 +56,45 @@ export interface InstallOptions {
  * Parse and validate raw install options.
  *
  * Converts raw CLI strings to typed options.
- * Returns default values for missing options.
+ * Falls back to configured default platform if no --platform flag.
+ * Returns null if platform is invalid or no platform can be resolved.
  *
  * @param raw - Raw options from CLI parser
- * @returns Validated options or null if invalid
- *
- * @example
- * ```typescript
- * const options = parseInstallOptions({ platform: "claude-code" });
- * if (options) {
- *   // options.platform is typed as Platform
- * }
- * ```
+ * @returns Validated options or null if invalid/missing platform
  */
-export function parseInstallOptions(
+export async function parseInstallOptions(
   raw: RawInstallOptions,
-): InstallOptions | null {
-  // Validate platform if provided
+): Promise<InstallOptions | null> {
+  // Explicit --platform flag takes priority
   if (raw.platform && raw.platform !== "all") {
     if (!isValidPlatform(raw.platform)) {
       return null;
     }
     return {
-      platform: raw.platform,
+      platforms: [raw.platform],
       version: raw.version,
     };
   }
 
-  // Default to claude-code
-  return {
-    platform: "claude-code",
-    version: raw.version,
-  };
+  // "all" means all supported platforms
+  if (raw.platform === "all") {
+    return {
+      platforms: [...VALID_PLATFORMS],
+      version: raw.version,
+    };
+  }
+
+  // Fall back to configured default platform
+  const defaultPlatform = await getDefaultPlatform();
+  if (defaultPlatform) {
+    return {
+      platforms: [defaultPlatform],
+      version: raw.version,
+    };
+  }
+
+  // No platform specified and no default configured
+  return null;
 }
 
 // ============================================================================
@@ -98,6 +106,7 @@ export function parseInstallOptions(
  */
 export interface RawSearchOptions {
   type?: string;
+  platform?: string;
   limit?: string;
   sort?: string;
 }
@@ -110,6 +119,8 @@ export interface SearchOptions {
   query: string;
   /** Filter by package type */
   type?: PackageType;
+  /** Filter by platform compatibility */
+  platform?: Platform;
   /** Maximum results to return */
   limit: number;
   /** Sort order */
@@ -166,6 +177,11 @@ export function parseSearchOptions(
     options.type = raw.type;
   }
 
+  // Validate and add platform if provided
+  if (raw.platform && isValidPlatform(raw.platform)) {
+    options.platform = raw.platform;
+  }
+
   // Validate and add sort if provided
   if (raw.sort && isSearchSort(raw.sort)) {
     options.sort = raw.sort;
@@ -179,22 +195,11 @@ export function parseSearchOptions(
 // ============================================================================
 
 /**
- * Information about an installed package.
+ * Re-export InstalledPackage from shared types.
+ * Moved there because adapters, commands, and base class all use it.
  */
-export interface InstalledPackage {
-  /** Full package name (e.g., @cpm/typescript-strict) */
-  name: string;
-  /** Folder name for uninstall command */
-  folderName: string;
-  /** Package type */
-  type: "rules" | "skill" | "mcp";
-  /** Version if available from metadata */
-  version?: string;
-  /** Absolute path to the package location */
-  path: string;
-  /** Platform this package is installed for */
-  platform?: "claude-code" | "cursor";
-}
+import type { InstalledPackage } from "../types.js";
+export type { InstalledPackage } from "../types.js";
 
 /**
  * List command result.

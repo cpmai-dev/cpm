@@ -17,3 +17,9 @@ export function getAdapter(platform: Platform): PlatformAdapter {
   }
   return adapter;
 }
+
+export function getAllAdapters(): PlatformAdapter[] {
+  return Object.values(adapters).filter(
+    (adapter): adapter is PlatformAdapter => adapter !== undefined,
+  );
+}

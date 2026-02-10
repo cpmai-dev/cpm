@@ -6,7 +6,12 @@ import got from "got";
 import fs from "fs-extra";
 import path from "path";
 import os from "os";
-import type { RegistryPackage, PackageType, SearchSort } from "../types.js";
+import type {
+  RegistryPackage,
+  PackageType,
+  Platform,
+  SearchSort,
+} from "../types.js";
 import { resolvePackageType } from "../types.js";
 import { LIMITS, TIMEOUTS } from "../constants.js";
 
@@ -41,6 +46,7 @@ export interface RegistryData {
 export interface SearchOptions {
   query?: string;
   type?: PackageType;
+  platform?: Platform;
   limit?: number;
   offset?: number;
   sort?: SearchSort;
@@ -138,6 +144,7 @@ export class Registry
 
     packages = this.filterByQuery(packages, options.query);
     packages = this.filterByType(packages, options.type);
+    packages = this.filterByPlatform(packages, options.platform);
     packages = this.sortPackages(packages, options.sort || "downloads");
 
     const total = packages.length;
@@ -259,6 +266,15 @@ export class Registry
         return false;
       }
     });
+  }
+
+  private filterByPlatform(
+    packages: RegistryPackage[],
+    platform?: Platform,
+  ): RegistryPackage[] {
+    if (!platform) return packages;
+
+    return packages.filter((pkg) => pkg.platforms?.includes(platform) ?? true);
   }
 
   private sortPackages(

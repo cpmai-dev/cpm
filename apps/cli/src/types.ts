@@ -239,6 +239,7 @@ export interface RegistryPackage {
   version: string;
   description: string;
   type?: PackageType;
+  platforms?: Platform[];
   author: string;
   downloads?: number;
   path?: string;
@@ -290,6 +291,29 @@ export interface PackageMetadata {
   version: string;
   type: PackageType;
   installedAt: string;
+}
+
+// ============================================================================
+// Installed Package Types
+// ============================================================================
+
+/**
+ * Information about an installed package.
+ * Used by adapters (listInstalled) and commands (list, uninstall).
+ */
+export interface InstalledPackage {
+  /** Full package name (e.g., @cpm/typescript-strict) */
+  name: string;
+  /** Folder name for uninstall command */
+  folderName: string;
+  /** Package type */
+  type: PackageType;
+  /** Version if available from metadata */
+  version?: string;
+  /** Absolute path to the package location */
+  path: string;
+  /** Platform this package is installed for */
+  platform?: Platform;
 }
 
 // ============================================================================

@@ -37,6 +37,9 @@ importers:
 
   apps/cli:
     dependencies:
+      "@clack/prompts":
+        specifier: ^1.0.0
+        version: 1.0.0
       chalk:
         specifier: ^5.4.1
         version: 5.6.2
@@ -88,6 +91,18 @@ importers:
         version: 2.1.9(@types/node@22.19.7)
 
 packages:
+  "@clack/core@1.0.0":
+    resolution:
+      {
+        integrity: sha512-Orf9Ltr5NeiEuVJS8Rk2XTw3IxNC2Bic3ash7GgYeA8LJ/zmSNpSQ/m5UAhe03lA6KFgklzZ5KTHs4OAMA/SAQ==,
+      }
+
+  "@clack/prompts@1.0.0":
+    resolution:
+      {
+        integrity: sha512-rWPXg9UaCFqErJVQ+MecOaWsozjaxol4yjnmYcGNipAWzdaWa2x+VJmKfGq7L0APwBohQOYdHC+9RO4qRXej+A==,
+      }
+
   "@esbuild/aix-ppc64@0.21.5":
     resolution:
       {
@@ -2332,6 +2347,12 @@ packages:
       }
     engines: { node: ">=14" }
 
+  sisteransi@1.0.5:
+    resolution:
+      {
+        integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==,
+      }
+
   slice-ansi@7.1.2:
     resolution:
       {
@@ -2776,6 +2797,17 @@ packages:
     engines: { node: ">=10" }
 
 snapshots:
+  "@clack/core@1.0.0":
+    dependencies:
+      picocolors: 1.1.1
+      sisteransi: 1.0.5
+
+  "@clack/prompts@1.0.0":
+    dependencies:
+      "@clack/core": 1.0.0
+      picocolors: 1.1.1
+      sisteransi: 1.0.5
+
   "@esbuild/aix-ppc64@0.21.5":
     optional: true
 
@@ -3958,6 +3990,8 @@ snapshots:
   siginfo@2.0.0: {}
 
   signal-exit@4.1.0: {}
+
+  sisteransi@1.0.5: {}
 
   slice-ansi@7.1.2:
     dependencies:

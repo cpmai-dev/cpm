@@ -76,12 +76,19 @@ function displayResults(
  *
  * @param query - The search query that had no results
  */
-function displayNoResults(query: string): void {
-  logger.warn(`No packages found for "${query}"`);
+function displayNoResults(query: string, platform?: string): void {
+  logger.warn(
+    `No packages found for "${query}"${platform ? ` on ${platform}` : ""}`,
+  );
   logger.log(
     SEMANTIC_COLORS.dim("\nAvailable package types: rules, skill, mcp"),
   );
   logger.log(SEMANTIC_COLORS.dim("Try: cpm search react --type rules"));
+  if (platform) {
+    logger.log(
+      SEMANTIC_COLORS.dim("Try removing --platform to search all platforms"),
+    );
+  }
 }
 
 // ============================================================================
@@ -127,6 +134,7 @@ export async function searchCommand(
       query: options.query,
       limit: options.limit,
       type: options.type,
+      platform: options.platform,
       sort: options.sort,
     });
 
@@ -137,7 +145,7 @@ export async function searchCommand(
     // Step 4: Display results
     // -----------------------------------------------------------------------
     if (results.packages.length === 0) {
-      displayNoResults(query);
+      displayNoResults(query, options.platform);
       return;
     }
 

@@ -1,12 +1,9 @@
 /**
  * List Command
  *
- * The list command scans:
- * - ~/.claude/rules/ - Claude Code rules packages
- * - ~/.claude/skills/ - Claude Code skill packages
- * - ~/.claude.json - Claude Code MCP server configurations
- * - .cursor/rules/ - Cursor rules packages (project-level)
- * - ~/.cursor/mcp.json - Cursor MCP server configurations
+ * Lists all installed packages across all registered platforms.
+ * Delegates scanning to platform adapters — no platform-specific
+ * paths or logic in this module.
  *
  * @example
  * ```bash
@@ -16,124 +13,23 @@
  */
 
 import chalk from "chalk";
-import fs from "fs-extra";
-import path from "path";
-import os from "os";
 import { logger } from "../utils/logger.js";
-import type { PackageMetadata } from "../types.js";
-import { getCursorMcpConfigPath } from "../utils/platform.js";
+import { getAllAdapters } from "../adapters/index.js";
+import type { InstalledPackage } from "../types.js";
 
 // Import UI layer
 import { getTypeColor, SEMANTIC_COLORS } from "./ui/index.js";
-
-// Import command types
-import type { InstalledPackage } from "./types.js";
 
 // ============================================================================
 // Scanning Functions
 // ============================================================================
 
-async function readPackageMetadata(
-  packageDir: string,
-): Promise<PackageMetadata | null> {
-  const metadataPath = path.join(packageDir, ".cpm.json");
-
-  try {
-    if (await fs.pathExists(metadataPath)) {
-      return await fs.readJson(metadataPath);
-    }
-  } catch {
-    // Ignore read errors
-  }
-
-  return null;
-}
-
-async function scanDirectory(
-  dir: string,
-  type: InstalledPackage["type"],
-  platform?: InstalledPackage["platform"],
-): Promise<InstalledPackage[]> {
-  const items: InstalledPackage[] = [];
-
-  if (!(await fs.pathExists(dir))) {
-    return items;
-  }
-
-  const entries = await fs.readdir(dir);
-
-  for (const entry of entries) {
-    const entryPath = path.join(dir, entry);
-    const stat = await fs.stat(entryPath);
-
-    if (stat.isDirectory()) {
-      const metadata = await readPackageMetadata(entryPath);
-      items.push({
-        name: metadata?.name || entry,
-        folderName: entry,
-        type,
-        version: metadata?.version,
-        path: entryPath,
-        platform,
-      });
-    }
-  }
-
-  return items;
-}
-
-async function scanMcpServersFromConfig(
-  configPath: string,
-  platform: InstalledPackage["platform"],
-): Promise<InstalledPackage[]> {
-  const items: InstalledPackage[] = [];
-
-  if (!(await fs.pathExists(configPath))) {
-    return items;
-  }
-
-  try {
-    const config = await fs.readJson(configPath);
-    const mcpServers = config.mcpServers || {};
-
-    for (const name of Object.keys(mcpServers)) {
-      items.push({
-        name,
-        folderName: name,
-        type: "mcp",
-        path: configPath,
-        platform,
-      });
-    }
-  } catch {
-    // Ignore parse errors
-  }
-
-  return items;
-}
-
 async function scanInstalledPackages(): Promise<InstalledPackage[]> {
-  const claudeHome = path.join(os.homedir(), ".claude");
-  const cursorRulesDir = path.join(process.cwd(), ".cursor", "rules");
-  const cursorMcpConfig = getCursorMcpConfigPath();
-  const claudeMcpConfig = path.join(os.homedir(), ".claude.json");
-
-  const [claudeRules, claudeSkills, claudeMcp, cursorRules, cursorMcp] =
-    await Promise.all([
-      scanDirectory(path.join(claudeHome, "rules"), "rules", "claude-code"),
-      scanDirectory(path.join(claudeHome, "skills"), "skill", "claude-code"),
-      scanMcpServersFromConfig(claudeMcpConfig, "claude-code"),
-      scanDirectory(cursorRulesDir, "rules", "cursor"),
-      scanMcpServersFromConfig(cursorMcpConfig, "cursor"),
-    ]);
-
-  return [
-    ...claudeRules,
-    ...claudeSkills,
-    ...claudeMcp,
-    ...cursorRules,
-    ...cursorMcp,
-  ];
+  const adapters = getAllAdapters();
+  const results = await Promise.all(
+    adapters.map((adapter) => adapter.listInstalled(process.cwd())),
+  );
+  return results.flat();
 }
 
 function groupByType(

@@ -3,10 +3,14 @@
  * Orchestrates package installation/uninstallation for Cursor IDE
  */
 
-import type { PackageManifest } from "../types.js";
+import path from "path";
+import fs from "fs-extra";
+import type { PackageManifest, InstalledPackage } from "../types.js";
 import { PlatformAdapter, InstallResult } from "./base.js";
 import { CursorRulesHandler } from "./handlers/cursor-rules-handler.js";
 import { CursorMcpHandler } from "./handlers/cursor-mcp-handler.js";
+import { scanDirectory, scanMcpServersFromConfig } from "./scanning.js";
+import { getCursorMcpConfigPath } from "../utils/platform.js";
 import { logger } from "../utils/logger.js";
 
 const cursorRulesHandler = new CursorRulesHandler();
@@ -89,6 +93,22 @@ export class CursorAdapter extends PlatformAdapter {
         error: error instanceof Error ? error.message : "Unknown error",
       };
     }
+  }
+
+  async listInstalled(projectPath: string): Promise<InstalledPackage[]> {
+    const cursorRulesDir = path.join(projectPath, ".cursor", "rules");
+    const cursorMcpConfig = getCursorMcpConfigPath();
+
+    const [rules, mcp] = await Promise.all([
+      scanDirectory(cursorRulesDir, "rules", "cursor"),
+      scanMcpServersFromConfig(cursorMcpConfig, "cursor"),
+    ]);
+
+    return [...rules, ...mcp];
+  }
+
+  async ensureDirs(projectPath: string): Promise<void> {
+    await fs.ensureDir(path.join(projectPath, ".cursor", "rules"));
   }
 
   private async installByType(

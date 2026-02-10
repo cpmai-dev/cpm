@@ -278,6 +278,57 @@ describe("CursorRulesHandler", () => {
     });
   });
 
+  describe("missing content handling", () => {
+    it("should warn and clean up directory when no content is found", async () => {
+      const manifest: PackageManifest = {
+        name: "@cpm/empty-rules",
+        version: "1.0.0",
+        description: "Empty rules",
+        type: "rules",
+      };
+
+      const files = await handler.install(manifest, { projectPath });
+
+      expect(files).toHaveLength(0);
+
+      // The directory should have been cleaned up
+      const rulesDir = path.join(
+        projectPath,
+        ".cursor",
+        "rules",
+        "cpm-empty-rules",
+      );
+      expect(await fs.pathExists(rulesDir)).toBe(false);
+    });
+
+    it("should warn and clean up when packagePath is empty", async () => {
+      const emptyPkgDir = path.join(tmpDir, "empty-pkg");
+      await fs.ensureDir(emptyPkgDir);
+
+      const manifest: PackageManifest = {
+        name: "@cpm/no-files",
+        version: "1.0.0",
+        description: "No files",
+        type: "rules",
+      };
+
+      const files = await handler.install(manifest, {
+        projectPath,
+        packagePath: emptyPkgDir,
+      });
+
+      expect(files).toHaveLength(0);
+
+      const rulesDir = path.join(
+        projectPath,
+        ".cursor",
+        "rules",
+        "cpm-no-files",
+      );
+      expect(await fs.pathExists(rulesDir)).toBe(false);
+    });
+  });
+
   describe("uninstall", () => {
     it("should remove package directory", async () => {
       const manifest: PackageManifest = {

@@ -23,7 +23,6 @@
 import type { PackageManifest, Platform } from "../types.js";
 import type { InstallResult as AdapterInstallResult } from "../adapters/base.js";
 import { getAdapter } from "../adapters/index.js";
-import { ensureClaudeDirs, ensureCursorDirs } from "../utils/config.js";
 import { registry } from "../utils/registry.js";
 import { downloadPackage, cleanupTempDir } from "../utils/downloader.js";
 import { logger } from "../utils/logger.js";
@@ -110,6 +109,7 @@ function partitionResults(
 function displaySuccess(
   manifest: PackageManifest,
   results: AdapterInstallResult[],
+  platforms: Platform[],
 ): void {
   // Show package description
   logger.log(SEMANTIC_COLORS.dim(`\n  ${manifest.description}`));
@@ -122,7 +122,7 @@ function displaySuccess(
 
   // Show usage hints
   logger.newline();
-  const hints = formatUsageHints(manifest);
+  const hints = formatUsageHints(manifest, platforms);
   hints.forEach((line) => logger.log(line));
 }
 
@@ -203,10 +203,25 @@ export async function installCommand(
   // -------------------------------------------------------------------------
   // Step 2: Parse and validate options
   // -------------------------------------------------------------------------
-  const options = parseInstallOptions(rawOptions);
+  const options = await parseInstallOptions(rawOptions);
   if (!options) {
-    logger.error(`Invalid platform: ${rawOptions.platform}`);
-    displayInvalidPlatform();
+    if (rawOptions.platform && rawOptions.platform !== "all") {
+      logger.error(`Invalid platform: ${rawOptions.platform}`);
+      displayInvalidPlatform();
+    } else {
+      logger.error("No platform specified.");
+      logger.log(
+        SEMANTIC_COLORS.dim(
+          `  Set a default: ${SEMANTIC_COLORS.highlight("cpm config set platform <platform>")}`,
+        ),
+      );
+      logger.log(
+        SEMANTIC_COLORS.dim(
+          `  Or use: ${SEMANTIC_COLORS.highlight("cpm install <package> --platform <platform>")}`,
+        ),
+      );
+      displayInvalidPlatform();
+    }
     return;
   }
 
@@ -248,16 +263,30 @@ export async function installCommand(
     tempDir = downloadResult.tempDir;
 
     // -----------------------------------------------------------------------
+    // Step 5.5: Check platform compatibility
+    // -----------------------------------------------------------------------
+    const targetPlatforms = options.platforms;
+    if (pkg.platforms?.length) {
+      const incompatible = targetPlatforms.filter(
+        (p) => !pkg.platforms!.includes(p),
+      );
+      if (incompatible.length > 0) {
+        logger.warn(
+          `${manifest.name} is listed for ${pkg.platforms.join(", ")} only. May not work on: ${incompatible.join(", ")}`,
+        );
+      }
+    }
+
+    // -----------------------------------------------------------------------
     // Step 6: Install to platforms
     // -----------------------------------------------------------------------
-    const targetPlatforms = [options.platform] as const;
     spinner.update(`Installing to ${targetPlatforms.join(", ")}...`);
 
-    if (options.platform === "cursor") {
-      await ensureCursorDirs(process.cwd());
-    } else {
-      await ensureClaudeDirs();
+    for (const platform of targetPlatforms) {
+      const adapter = getAdapter(platform);
+      await adapter.ensureDirs(process.cwd());
     }
+
     const results = await installToPlatforms(
       manifest,
       tempDir,
@@ -273,7 +302,7 @@ export async function installCommand(
       spinner.succeed(
         successText("Installed", manifest.name, manifest.version),
       );
-      displaySuccess(manifest, successful);
+      displaySuccess(manifest, successful, targetPlatforms);
     } else {
       spinner.fail(failText("Failed to install", manifest.name));
     }

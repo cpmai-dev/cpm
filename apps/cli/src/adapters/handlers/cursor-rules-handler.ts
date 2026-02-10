@@ -133,7 +133,14 @@ export class CursorRulesHandler implements PackageHandler {
     }
 
     const rulesContent = this.getRulesContent(manifest);
-    if (!rulesContent) return filesWritten;
+    if (!rulesContent) {
+      logger.warn(
+        `No rules content found for "${manifest.name}". ` +
+          "The package may be missing content files or inline rules.",
+      );
+      await fs.remove(rulesDir);
+      return filesWritten;
+    }
 
     const rulesPath = path.join(rulesDir, "RULES.mdc");
     const mdcContent = toMdcContent(description, globs, rulesContent);

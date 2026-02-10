@@ -3,10 +3,14 @@
  * Orchestrates package installation/uninstallation using handlers
  */
 
-import type { PackageManifest } from "../types.js";
+import path from "path";
+import fs from "fs-extra";
+import type { PackageManifest, InstalledPackage } from "../types.js";
 import { isMcpManifest, isSkillManifest, isRulesManifest } from "../types.js";
 import { PlatformAdapter, InstallResult } from "./base.js";
 import { handlerRegistry } from "./handlers/index.js";
+import { scanDirectory, scanMcpServersFromConfig } from "./scanning.js";
+import { getClaudeHome } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 
 export class ClaudeCodeAdapter extends PlatformAdapter {
@@ -53,7 +57,7 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
 
     try {
       // Delegate to all registered handlers
-      for (const type of ["rules", "skill", "mcp"] as const) {
+      for (const type of handlerRegistry.getRegisteredTypes()) {
         if (handlerRegistry.hasHandler(type)) {
           const handler = handlerRegistry.getHandler(type);
           const files = await handler.uninstall(packageName, context);
@@ -74,6 +78,25 @@ export class ClaudeCodeAdapter extends PlatformAdapter {
         error: error instanceof Error ? error.message : "Unknown error",
       };
     }
+  }
+
+  async listInstalled(_projectPath: string): Promise<InstalledPackage[]> {
+    const claudeHome = getClaudeHome();
+    const claudeMcpConfig = path.join(path.dirname(claudeHome), ".claude.json");
+
+    const [rules, skills, mcp] = await Promise.all([
+      scanDirectory(path.join(claudeHome, "rules"), "rules", "claude-code"),
+      scanDirectory(path.join(claudeHome, "skills"), "skill", "claude-code"),
+      scanMcpServersFromConfig(claudeMcpConfig, "claude-code"),
+    ]);
+
+    return [...rules, ...skills, ...mcp];
+  }
+
+  async ensureDirs(_projectPath: string): Promise<void> {
+    const claudeHome = getClaudeHome();
+    await fs.ensureDir(path.join(claudeHome, "rules"));
+    await fs.ensureDir(path.join(claudeHome, "skills"));
   }
 
   private async installByType(

@@ -153,8 +153,15 @@ export class RulesHandler implements PackageHandler {
     // Fallback: No package files to copy, so create from manifest content
     const rulesContent = this.getRulesContent(manifest);
 
-    // If there's no content to write, return empty (nothing to do)
-    if (!rulesContent) return filesWritten;
+    // If there's no content to write, warn and clean up empty directory
+    if (!rulesContent) {
+      logger.warn(
+        `No rules content found for "${manifest.name}". ` +
+          "The package may be missing content files or inline rules.",
+      );
+      await fs.remove(rulesDir);
+      return filesWritten;
+    }
 
     // Create the rules file path
     const rulesPath = path.join(rulesDir, "RULES.md");

@@ -13,7 +13,11 @@
 
 import chalk from "chalk";
 import path from "path";
-import type { RegistryPackage, PackageManifest } from "../../types.js";
+import type {
+  RegistryPackage,
+  PackageManifest,
+  Platform,
+} from "../../types.js";
 import { resolvePackageType } from "../../types.js";
 import { getTypeColor, getTypeEmoji, SEMANTIC_COLORS } from "./colors.js";
 
@@ -141,6 +145,7 @@ export function formatPackageMetadata(pkg: RegistryPackage): string {
 
   const parts = [
     typeColor(pkgType),
+    pkg.platforms?.length ? chalk.dim(pkg.platforms.join(", ")) : null,
     chalk.dim(`↓ ${formatNumber(pkg.downloads ?? 0)}`),
     pkg.stars !== undefined ? chalk.dim(`★ ${pkg.stars}`) : null,
     chalk.dim(`@${pkg.author}`),
@@ -226,7 +231,10 @@ export function formatRemovedFiles(files: string[]): string[] {
  * // ["  Usage: Type /my-command in your editor"]
  * ```
  */
-export function formatUsageHints(manifest: PackageManifest): string[] {
+export function formatUsageHints(
+  manifest: PackageManifest,
+  platforms?: Platform[],
+): string[] {
   const hints: string[] = [];
 
   switch (manifest.type) {
@@ -252,9 +260,17 @@ export function formatUsageHints(manifest: PackageManifest): string[] {
       if ("mcp" in manifest && manifest.mcp?.env) {
         const envVars = Object.keys(manifest.mcp.env);
         if (envVars.length > 0) {
+          const MCP_CONFIG_PATHS: Record<string, string> = {
+            "claude-code": "~/.claude.json",
+            cursor: "~/.cursor/mcp.json",
+          };
+          const configPaths = (platforms ?? ["claude-code"]).map(
+            (p) => MCP_CONFIG_PATHS[p] ?? `<MCP config for ${p}>`,
+          );
+          const uniquePaths = [...new Set(configPaths)];
           hints.push(
             chalk.yellow(
-              `\n  Configure these environment variables in ~/.claude.json:`,
+              `\n  Configure these environment variables in ${uniquePaths.join(" and ")}:`,
             ),
           );
           for (const envVar of envVars) {
