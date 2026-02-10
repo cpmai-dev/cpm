@@ -24,8 +24,9 @@ import * as tar from "tar";
 import yaml from "yaml";
 import type { RegistryPackage, PackageManifest } from "../types.js";
 import type { ManifestSource, FetchContext } from "./types.js";
-import { TIMEOUTS } from "../constants.js";
+import { TIMEOUTS, LIMITS } from "../constants.js";
 import { logger } from "../utils/logger.js";
+import { validateManifest } from "../validation/manifest-schema.js";
 
 /**
  * Source that fetches manifests from tarball downloads.
@@ -116,6 +117,15 @@ export class TarballSource implements ManifestSource {
         responseType: "buffer", // Get raw binary data
       });
 
+      // Check tarball size before writing to disk
+      if (response.body.length > LIMITS.MAX_TARBALL_BYTES) {
+        const sizeMb = (response.body.length / (1024 * 1024)).toFixed(1);
+        const limitMb = (LIMITS.MAX_TARBALL_BYTES / (1024 * 1024)).toFixed(0);
+        throw new Error(
+          `Tarball too large (${sizeMb} MB, limit ${limitMb} MB)`,
+        );
+      }
+
       // Save the tarball to the temp directory
       const tarballPath = path.join(context.tempDir, "package.tar.gz");
       await fs.writeFile(tarballPath, response.body);
@@ -128,9 +138,9 @@ export class TarballSource implements ManifestSource {
 
       // Check if the manifest file exists
       if (await fs.pathExists(manifestPath)) {
-        // Read and parse the YAML manifest
+        // Read, parse, and validate the YAML manifest
         const content = await fs.readFile(manifestPath, "utf-8");
-        return yaml.parse(content);
+        return validateManifest(yaml.parse(content));
       }
 
       // No manifest file found in the tarball

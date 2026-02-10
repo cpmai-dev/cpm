@@ -52,6 +52,7 @@ export const TIMEOUTS = {
 export const LIMITS = {
   MAX_PACKAGE_NAME_LENGTH: 214, // npm standard maximum
   CACHE_TTL_MS: 5 * 60 * 1000, // 5 minutes in milliseconds
+  MAX_TARBALL_BYTES: 50 * 1024 * 1024, // 50 MB - prevents disk-fill attacks
 } as const;
 
 // ============================================================================

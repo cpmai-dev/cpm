@@ -28,6 +28,7 @@ import type { ManifestSource, FetchContext } from "./types.js";
 import { TIMEOUTS } from "../constants.js";
 import { sanitizeFileName } from "../security/index.js";
 import { logger } from "../utils/logger.js";
+import { validateManifest } from "../validation/manifest-schema.js";
 
 const PACKAGES_REPO_BASE =
   "https://raw.githubusercontent.com/cpmai-dev/packages/main/packages";
@@ -108,16 +109,16 @@ export class RepositorySource implements ManifestSource {
         timeout: { request: TIMEOUTS.MANIFEST_FETCH },
       });
 
-      const manifest = yaml.parse(response.body);
+      const raw = yaml.parse(response.body);
 
       // Content download is best-effort — don't let it prevent manifest return
       try {
-        await this.downloadContentFiles(manifest, baseUrl, context.tempDir);
+        await this.downloadContentFiles(raw, baseUrl, context.tempDir);
       } catch {
         // Content download failed, but manifest is still valid
       }
 
-      return manifest;
+      return validateManifest(raw);
     } catch {
       return null;
     }
@@ -139,16 +140,16 @@ export class RepositorySource implements ManifestSource {
         timeout: { request: TIMEOUTS.MANIFEST_FETCH },
       });
 
-      const manifest = yaml.parse(response.body);
+      const raw = yaml.parse(response.body);
 
       // Content download is best-effort — don't let it prevent manifest return
       try {
-        await this.downloadContentFiles(manifest, baseUrl, context.tempDir);
+        await this.downloadContentFiles(raw, baseUrl, context.tempDir);
       } catch {
         // Content download failed, but manifest is still valid
       }
 
-      return manifest;
+      return validateManifest(raw);
     } catch {
       return null;
     }
