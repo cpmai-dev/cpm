@@ -6,12 +6,12 @@ import { RepositorySource } from "../sources/repository-source.js";
 import type { RegistryPackage } from "../types.js";
 
 // Mock got for HTTP requests
-vi.mock("got", () => ({
-  default: vi.fn(),
+const { mockedGot } = vi.hoisted(() => ({
+  mockedGot: vi.fn(),
 }));
-
-import got from "got";
-const mockedGot = vi.mocked(got);
+vi.mock("got", () => ({
+  default: mockedGot,
+}));
 
 describe("RepositorySource", () => {
   const source = new RepositorySource();

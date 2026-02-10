@@ -25,14 +25,6 @@ const PLATFORM_INFO: Record<Platform, { label: string; hint: string }> = {
     label: "Cursor",
     hint: "AI-powered code editor",
   },
-  windsurf: {
-    label: "Windsurf",
-    hint: "AI-powered IDE by Codeium",
-  },
-  continue: {
-    label: "Continue",
-    hint: "Open-source AI code assistant",
-  },
 };
 
 export async function initCommand(): Promise<void> {
